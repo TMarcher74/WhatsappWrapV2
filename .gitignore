@@ -4,3 +4,9 @@ venv/
 
 # VS Code settings
 .vscode/
+
+# Pycharm settings
+.idea/
+
+# Python cache
+**/__pycache__/
