@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from backend.constants import Tags
+from constants import Tags
 
 router = APIRouter(prefix="/status")
 

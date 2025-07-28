@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
 
-from backend.constants import Tags, MAX_UPLOAD_FILE_SIZE
+from constants import Tags, MAX_UPLOAD_FILE_SIZE
 
 
 router = APIRouter()
@@ -14,6 +14,8 @@ async def anlayse_chat(
             status_code = status.HTTP_406_NOT_ACCEPTABLE,
             detail = "Wrong file type uploaded, only .txt is accepted"
         )
+    print(file.size)
+    print(MAX_UPLOAD_FILE_SIZE)
     if file.size > MAX_UPLOAD_FILE_SIZE:
         raise HTTPException(
             status_code = status.HTTP_406_NOT_ACCEPTABLE,
