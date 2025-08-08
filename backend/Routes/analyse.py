@@ -12,17 +12,21 @@ async def anlayse_chat(
     if file.content_type != "text/plain":
         raise HTTPException(
             status_code = status.HTTP_406_NOT_ACCEPTABLE,
-            detail = "Wrong file type uploaded, only .txt is accepted"
+            detail = "Wrong file type uploaded, only text files are accepted"
         )
-    print(file.size)
-    print(MAX_UPLOAD_FILE_SIZE)
     if file.size > MAX_UPLOAD_FILE_SIZE:
         raise HTTPException(
             status_code = status.HTTP_406_NOT_ACCEPTABLE,
             detail = "File size exceeds 18MB"
         )
 
+    # Sanitise data, remove names
+
+    # Send it to AI
+
     # Send it to parser
 
     else:
+        contents = await file.read()
+
         return file
