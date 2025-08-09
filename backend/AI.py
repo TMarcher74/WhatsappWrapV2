@@ -1,5 +1,4 @@
-# Gemini/GPT/any of the other 100+ LLMs apis
-# AIzaSyBbzu4VHtP5FWzLB5PApAtHHVUEVCvG1VQ
+# Gemini API key: AIzaSyBbzu4VHtP5FWzLB5PApAtHHVUEVCvG1VQ
 import asyncio
 from random import choice
 
@@ -10,8 +9,8 @@ from constants import GeminiModels
 client = genai.Client(api_key="AIzaSyBbzu4VHtP5FWzLB5PApAtHHVUEVCvG1VQ")
 # Remember to set this API in env file instead
 
-async def gem():
-    txtFile = await client.aio.files.upload(file="Rough.txt")
+async def gemini():
+    txtFile = await client.aio.files.upload(file="Sample.txt")
 
     response = await client.aio.models.generate_content_stream(
         model = GeminiModels.G25FlashLite,
@@ -26,5 +25,6 @@ async def gem():
 
     client.files.delete(name=txtFile.name)
 
+
 if __name__ == '__main__':
-    asyncio.run(gem())
+    asyncio.run(gemini())

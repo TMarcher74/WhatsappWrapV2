@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
 
 from constants import Tags, MAX_UPLOAD_FILE_SIZE
+from parser import Parser
 
 
 router = APIRouter()
@@ -19,14 +20,17 @@ async def anlayse_chat(
             status_code = status.HTTP_406_NOT_ACCEPTABLE,
             detail = "File size exceeds 18MB"
         )
-
+    
     # Sanitise data, remove names
 
     # Send it to AI
 
     # Send it to parser
+    
+    raw_bytes = await file.read()
+    chat_text = raw_bytes.decode("utf-8")  #, errors="ignore")
+    x = Parser(chat_text)
+    return x.get_messages()
 
-    else:
-        contents = await file.read()
 
-        return file
+    return chat_text  # For now, just return the text
