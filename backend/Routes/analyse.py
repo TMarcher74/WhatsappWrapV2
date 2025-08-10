@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, status
 
 from constants import Tags, MAX_UPLOAD_FILE_SIZE
 from parser import Parser
+import analyser
 
 
 router = APIRouter()
@@ -30,7 +31,8 @@ async def anlayse_chat(
     raw_bytes = await file.read()
     chat_text = raw_bytes.decode("utf-8")  #, errors="ignore")
     x = Parser(chat_text)
-    return x.get_messages()
+    messages = x.get_messages()
+    return analyser.get_most_used_words(messages, 30)
 
 
     return chat_text  # For now, just return the text
