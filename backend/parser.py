@@ -1,7 +1,3 @@
-# Keep js parsing or shd I re-write it in python?
-# I think I want to re-write it, since we need to fix some
-# issues with the current parser, and it would be easier to do in python.
-
 from datetime import datetime
 import re
 
@@ -67,3 +63,27 @@ class Parser:
         Get messages
         """
         return [msg["message"] for msg in self.messages]
+
+    def get_messages_by_user(self, user:str) -> list[str]:
+        """
+        Get messages sent by a user
+        """
+        return [msg["message"] for msg in self.messages if msg["sender"] == user]
+
+    def get_date_by_user(self, user:str) -> list[datetime.time]:
+        """
+        Get dates of messages sent by a user
+        """
+        return [
+            datetime.strptime(msg["date"], "%d/%m/%Y").date()
+            for msg in self.messages if msg["sender"] == user
+        ]
+
+    def get_time_by_user(self, user:str) -> list[datetime.time]:
+        """
+        Get time of messages sent by a user
+        """
+        return [
+            datetime.strptime(msg["time"], "%H:%M").time()
+            for msg in self.messages if msg["sender"] == user
+        ]

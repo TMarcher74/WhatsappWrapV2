@@ -31,8 +31,17 @@ async def anlayse_chat(
     raw_bytes = await file.read()
     chat_text = raw_bytes.decode("utf-8")  #, errors="ignore")
     x = Parser(chat_text)
+
+    messages1 = {}
+    for user in x.get_users():
+        temp = {user: x.get_messages_by_user(user)}
+        messages1.update(temp)
+
+    return analyser.get_messages_edited_count(messages1)
+    return messages1
+
     messages = x.get_messages()
-    return analyser.get_most_used_words(messages, 30)
+    return analyser.get_most_used_words(messages, True, 30)
 
 
     return chat_text  # For now, just return the text
