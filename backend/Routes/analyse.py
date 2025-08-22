@@ -11,6 +11,7 @@ router = APIRouter()
 async def anlayse_chat(
         file: UploadFile = File(...)
 ):
+    # validate file
     if file.content_type != "text/plain":
         raise HTTPException(
             status_code = status.HTTP_406_NOT_ACCEPTABLE,
@@ -21,27 +22,36 @@ async def anlayse_chat(
             status_code = status.HTTP_406_NOT_ACCEPTABLE,
             detail = "File size exceeds 18MB"
         )
+
+    raw_bytes = await file.read()
+    chat_text = raw_bytes.decode("utf-8")  #, errors="ignore")
     
     # Sanitise data, remove names
 
     # Send it to AI
 
     # Send it to parser
-    
-    raw_bytes = await file.read()
-    chat_text = raw_bytes.decode("utf-8")  #, errors="ignore")
-    x = Parser(chat_text)
+    parser = Parser(chat_text)
 
-    messages1 = {}
-    for user in x.get_users():
-        temp = {user: x.get_messages_by_user(user)}
-        messages1.update(temp)
+    # Organize messages by user
+    user_messages = {
+        user: parser.get_messages_by_user(user)
+        for user in parser.get_users()
+    }
 
-    return analyser.get_messages_edited_count(messages1)
-    return messages1
+    # Run analysis
+    analysis = {
+        "users": parser.get_users(),
+        "total_messages": analyser.get_messages_count(user_messages),
+        "word_character_stats": analyser.get_word_char_count(user_messages),
+        # "sum_of_total_messages":len(parser.get_messages()),
+        "deleted_messages": analyser.get_messages_deleted_count(user_messages),
+        "edited_messages": analyser.get_messages_edited_count(user_messages),
+        "media": analyser.get_media_sent_count(user_messages),
+        "top_words": analyser.get_most_used_words(parser.get_messages(), True, 10, 2),
+        "message_date_time": {user: parser.get_date_time_by_user(user) for user in parser.get_users()},
+        "emoji_count": analyser.get_emoji_count(user_messages),
+    }
 
-    messages = x.get_messages()
-    return analyser.get_most_used_words(messages, True, 30)
+    return analysis
 
-
-    return chat_text  # For now, just return the text

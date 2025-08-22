@@ -70,6 +70,15 @@ class Parser:
         """
         return [msg["message"] for msg in self.messages if msg["sender"] == user]
 
+    def get_date_time_by_user(self, user:str) -> list[datetime.time]:
+        """
+        Get dates and times of messages sent by a user
+        """
+        return [
+            datetime.strptime(f"{msg["date"]} {msg["time"]}", "%d/%m/%Y %H:%M")
+            for msg in self.messages if msg["sender"] == user
+        ]
+
     def get_date_by_user(self, user:str) -> list[datetime.time]:
         """
         Get dates of messages sent by a user
