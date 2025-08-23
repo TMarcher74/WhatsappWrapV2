@@ -51,6 +51,12 @@ class Parser:
             for msg in self.messages
         ]
 
+    def get_users_wrt_messages(self) -> list[str]:
+        """
+        Gets the usernames with respect to each message
+        """
+        return list(msg["sender"] for msg in self.messages)
+
     def get_users(self) -> list[str]:
         """
         Gets the usernames of everyone in thr group
@@ -58,40 +64,51 @@ class Parser:
         """
         return list(set(msg["sender"] for msg in self.messages))
 
-    def get_messages(self) -> list[str]:
-        """
-        Get messages
-        """
-        return [msg["message"] for msg in self.messages]
-
-    def get_messages_by_user(self, user:str) -> list[str]:
+    def get_messages_by_user(self, user:str = None) -> list[str]:
         """
         Get messages sent by a user
         """
+        if user is None:
+            return [msg["message"] for msg in self.messages]
         return [msg["message"] for msg in self.messages if msg["sender"] == user]
 
-    def get_date_time_by_user(self, user:str) -> list[datetime.time]:
+    def get_date_time_by_user(self, user:str = None) -> list[datetime]:
         """
         Get dates and times of messages sent by a user
         """
+        if user is None:
+            return [
+                datetime.strptime(f"{msg["date"]} {msg["time"]}", "%d/%m/%Y %H:%M")
+                for msg in self.messages
+            ]
         return [
             datetime.strptime(f"{msg["date"]} {msg["time"]}", "%d/%m/%Y %H:%M")
             for msg in self.messages if msg["sender"] == user
         ]
 
-    def get_date_by_user(self, user:str) -> list[datetime.time]:
+    def get_date_by_user(self, user:str = None) -> list[datetime.time]:
         """
         Get dates of messages sent by a user
         """
+        if user is None:
+            return [
+                datetime.strptime(msg["date"], "%d/%m/%Y").date()
+                for msg in self.messages
+            ]
         return [
             datetime.strptime(msg["date"], "%d/%m/%Y").date()
             for msg in self.messages if msg["sender"] == user
         ]
 
-    def get_time_by_user(self, user:str) -> list[datetime.time]:
+    def get_time_by_user(self, user:str = None) -> list[datetime.time]:
         """
         Get time of messages sent by a user
         """
+        if user is None:
+            return [
+                datetime.strptime(msg["time"], "%H:%M").time()
+                for msg in self.messages
+            ]
         return [
             datetime.strptime(msg["time"], "%H:%M").time()
             for msg in self.messages if msg["sender"] == user

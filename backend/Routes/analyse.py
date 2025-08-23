@@ -43,14 +43,23 @@ async def anlayse_chat(
     analysis = {
         "users": parser.get_users(),
         "total_messages": analyser.get_messages_count(user_messages),
-        "word_character_stats": analyser.get_word_char_count(user_messages),
+        "word_character_stats": analyser.get_word_char_stats(user_messages),
         # "sum_of_total_messages":len(parser.get_messages()),
         "deleted_messages": analyser.get_messages_deleted_count(user_messages),
         "edited_messages": analyser.get_messages_edited_count(user_messages),
         "media": analyser.get_media_sent_count(user_messages),
-        "top_words": analyser.get_most_used_words(parser.get_messages(), True, 10, 2),
-        "message_date_time": {user: parser.get_date_time_by_user(user) for user in parser.get_users()},
+        "top_words": analyser.get_most_used_words(parser.get_messages_by_user(), stop_words = True, top_n = 30, min_length = 2),
         "emoji_count": analyser.get_emoji_count(user_messages),
+        "longest_streak": analyser.get_longest_streak(parser.get_date_by_user()),
+        "convos": analyser.get_top_convos(
+            parser.get_date_time_by_user(),
+            parser.get_messages_by_user(),
+            parser.get_users_wrt_messages(),
+            min_convo_time = 3,
+            min_convo_length = 10,
+            top_n = 10
+        ),
+        # "message_date_time": {user: parser.get_date_time_by_user(user) for user in parser.get_users()},
     }
 
     return analysis
