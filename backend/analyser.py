@@ -5,8 +5,10 @@ from typing import Union
 from emoji import is_emoji
 import nltk
 from nltk.corpus import stopwords
-from collections import Counter
+from collections import Counter, defaultdict
 import statistics
+from urllib.parse import urlparse
+from constants import DOMAIN_MAPS
 
 nltk.download('stopwords')
 custom_stopwords = {'media','omitted','message','deleted','edited','https','com'}
@@ -50,7 +52,6 @@ def get_messages_count(user_messages: dict, check_strings: Union[str, list[str]]
 
     return message_count
 
-
 def get_messages_deleted_count(user_messages: dict) -> dict[str:int]:
     """
     Gets the count of deleted messages by each user
@@ -72,22 +73,87 @@ def get_media_sent_count(user_messages: dict) -> dict[str:int]:
     media_message = "<Media omitted>"
     return get_messages_count(user_messages, media_message)
 
-def get_emoji_count(user_messages: dict) -> dict[str:list[int:dict[str:int]]]:
+def find_emoticons_dict(text):
+    emoticons_pattern = re.compile(
+    r"""(?<!\S)                           # no non-space before
+    (?:
+        [:=;]-?[\)DPO3/\\]     # :) :-) :D :-D :P :-P :3 :-3 :/ :-/
+      | [:=]-?\(               # :( :-(
+      | [:=]'-?\(              # :'( :'-(
+      | [:=]-?[oO0]            # :o :-o :O :-O :0
+      | [:=]-?[sS]             # :s :-s :S :-S
+      | [:=]-?[@$]             # :@ :-@ :$ :-$
+      | [:=]-?[\|]             # :| :-|
+      | ;[-]?[)D]              # ;) ;-) ;D ;-D
+      | xD|XD                  # xD XD
+      | <3                     # <3 heart
+      | :"\)                   # :")
+      | :"\(                   # :"(
+      | :'\(                   # :'(
+      | :'\)                   # :')
+    )
+    (?!\S)                     # no non-space after
+    """,
+    re.VERBOSE
+)
+    found_emoticons = re.findall(emoticons_pattern, text)
+    count = len(found_emoticons)
+
+    return count, found_emoticons
+
+def get_emoji_emoticon_count(user_messages: dict) -> dict[str:list[int:dict[str:int]]]:
     """
     Get the count of emojis sent by a user
     """
-    emoji_count = {}
+    emoji_counter, emoticon_counter = {}, {}
     for user, messages in user_messages.items():
-        count = 0
+        emoji_count = 0
         emoji_freq = Counter()
+        emoticon_count= 0
+        emoticon_freq = Counter()
         for msg in messages:
             for char in msg:
                 if is_emoji(char):
-                    count += 1
+                    emoji_count += 1
                     emoji_freq.update(char)
-        emoji_count[user] = [count, dict(emoji_freq.most_common())]
+            a, b = find_emoticons_dict(msg)
+            emoticon_count += a
+            emoticon_freq.update(b)
+        emoji_counter[user] = [emoji_count, dict(emoji_freq.most_common())]
+        emoticon_counter[user] = [emoticon_count, dict(emoticon_freq.most_common())]
 
-    return emoji_count
+    return emoji_counter, emoticon_counter
+
+def classify_url(raw_url: str) -> str:
+    try:
+        parsed = urlparse(raw_url)
+        domain = parsed.netloc.lower()
+        if domain.startswith("www."):
+            domain = domain[4:]
+        for platform, domains in DOMAIN_MAPS.items():
+            if any(domain == d or domain.endswith("." + d) for d in domains):
+                return platform
+        return domain
+    except Exception:
+        return "other"
+
+def get_links(user_messages: dict):
+    url_pattern = re.compile(r"https?://\S+")
+    url_count = {}
+
+    for user, messages in user_messages.items():
+        urls = []
+        count = defaultdict(int)
+        for msg in messages:
+            found_urls = url_pattern.findall(msg)
+            for raw_url in found_urls:
+                platform = classify_url(raw_url)
+                urls.append(raw_url)
+                count[platform] += 1
+        sorted_count = dict(sorted(count.items(), key=lambda x: x[1], reverse=True))
+        url_count[user] = [sorted_count,urls]
+
+    return url_count
 
 def get_word_char_stats(user_messages: dict):
     """
@@ -125,47 +191,87 @@ def get_top_convos(
         date_times: list[datetime],
         messages: list[str],
         users: list[str],
-        min_convo_time: int = 3,
-        min_convo_length: int = 10,
+        min_convo_time: int = 5,
+        min_convo_length: int = 20,
         top_n: int = 5
 ):
-    START_CONV = datetime.timedelta(minutes=5)
-    CONT_CONV = datetime.timedelta(minutes=2)
+    combined = sorted(zip(date_times, users, messages), key=lambda x: x[0])
+    date_times, users, messages = zip(*combined)
 
-    i = 0
-    all_conversations, longest_conversation, most_messages_conversation = [], [], []
+    gaps = [(date_times[i + 1] - date_times[i]).total_seconds()
+            for i in range(len(date_times) - 1)]
+    if not gaps:
+        return {}
+
+    sorted_gaps = sorted(gaps)
+    idx = int(0.9 * len(sorted_gaps)) # 90th percentile of gaps
+    T = sorted_gaps[idx]
+    T = max(120, min(1800, T))  # clamp between 120s and 1800s
+    gap_thresh = timedelta(seconds=T)
+
+    #group into conversations (rolling window)
+    conversations = []
+    current_conv = [(date_times[0], users[0], messages[0])]
+    for i in range(1, len(date_times)):
+        gap = date_times[i] - date_times[i - 1]
+        if gap <= gap_thresh:
+            current_conv.append((date_times[i], users[i], messages[i]))
+        else:
+            conversations.append(current_conv)
+            current_conv = [(date_times[i], users[i], messages[i])]
+    if current_conv:
+        conversations.append(current_conv)
+
+    #analyze conversations
+    all_conversations = []
+    longest_conversation = None
+    most_messages_conversation = None
     longest_duration = timedelta(seconds=0)
     most_messages = 0
-    while i < len(date_times)-1:
-        conversation = []
-        if date_times[i+1] - date_times[i] <= START_CONV:
-            start = date_times[i]
-            conversation.append([start, users[i], messages[i]])
-            i += 1
-            while i+1 < len(date_times) and date_times[i+1] - date_times[i] <= CONT_CONV:
-                conversation.append([date_times[i], users[i], messages[i]])
-                i += 1
 
-            conversation.append([date_times[i], users[i], messages[i]])
-            end = date_times[i]
+    for conv in conversations:
+        start = conv[0][0]
+        end= conv[-1][0]
+        duration = end - start
+        msgs = len(conv)
+        participants = set(u for ts, u, msg in conv)
 
-            conv_duration = end - start + timedelta(seconds=60)
-            message_count = len(conversation)
-            if conv_duration > longest_duration:
-                longest_duration = conv_duration
-                longest_conversation = [{longest_duration.seconds/60:conversation}]
-            if message_count > most_messages:
-                most_messages = message_count
-                most_messages_conversation = [{most_messages: conversation}]
-            if conv_duration.seconds > min_convo_time * 60 and message_count > min_convo_length:
-                messages_per_minute = message_count/(conv_duration.seconds/60)
-                all_conversations.append({messages_per_minute:conversation})
-        i+=1
+        # filter short convos
+        if duration.total_seconds() < min_convo_time * 60 or msgs < min_convo_length:
+            continue
 
-    all_conversations.sort(key=lambda x: next(iter(x)), reverse=True)
-    return {"Longest conversation in minutes":longest_conversation,
-            "Most messages sent in a conversation":most_messages_conversation,
-            "Messages per minute":all_conversations[:top_n]}
+        mpm = msgs / max(duration.total_seconds() / 60, 1)  # messages per min
+        upm = len(participants) / max(duration.total_seconds() / 60, 1)  # unique participants per min
+
+        convo_stats = {
+            "start": start,
+            "end": end,
+            "duration_min": duration.total_seconds() / 60,
+            "messages": msgs,
+            "participants": participants,
+            "messages_per_min": mpm,
+            "unique_participants_per_min": upm,
+            "conversation": conv
+        }
+        all_conversations.append(convo_stats)
+
+        # track longest & busiest
+        if duration > longest_duration:
+            longest_duration = duration
+            longest_conversation = convo_stats
+        if msgs > most_messages:
+            most_messages = msgs
+            most_messages_conversation = convo_stats
+
+    return {
+        "gap_threshold_seconds": gap_thresh.total_seconds(),
+        "Longest conversation": longest_conversation,
+        "Most messages conversation": most_messages_conversation,
+        f"Top {top_n} by messages / min":
+            sorted(all_conversations, key=lambda x: x["messages_per_min"], reverse=True)[:top_n],
+        f"Top {top_n} by messages / min * unique participants / min":
+            sorted(all_conversations, key=lambda x: x["messages_per_min"] * x["unique_participants_per_min"], reverse=True)[:top_n],
+    }
 
 def get_longest_streak(dates: list[datetime.date]):
     i, streak, count = 0, 0, 0

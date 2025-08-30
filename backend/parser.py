@@ -19,7 +19,7 @@ class Parser:
 
         pattern = re.compile(
             rf"{date},\s+{time}\s+-\s+{name}:\s+{message}",
-            re.DOTALL
+            re.DOTALL | re.MULTILINE
         )
         messages = pattern.findall(self.chat_text)
 
