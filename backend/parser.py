@@ -81,6 +81,13 @@ class Parser:
 
         return user_messages, system_messages
 
+    def is_group(self) -> bool:
+        """
+        Checks if the chat uploaded is that of a group or between two ppl
+        """
+        if len(self.get_users()) > 2: return True
+        return False
+
     def get_dates(self) -> list[datetime.date]:
         """
         Get formated dates for all the messages
@@ -97,14 +104,14 @@ class Parser:
         """
         Gets the usernames with respect to each message
         """
-        return list(msg["sender"] for msg in self.user_messages)
+        return list(msg["sender"] for msg in self.user_messages if msg["sender"] != "Meta AI")
 
     def get_users(self) -> list[str]:
         """
         Gets the usernames of everyone in thr group
         Note: Does not work if they have never sent a message
         """
-        return list(set(msg["sender"] for msg in self.user_messages))
+        return list(set(msg["sender"] for msg in self.user_messages if msg["sender"] != "Meta AI"))
 
     def get_messages_by_user(self, user:str = None) -> list[str]:
         """

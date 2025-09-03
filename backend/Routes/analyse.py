@@ -60,6 +60,7 @@ async def anlayse_chat(
             min_convo_length = 20,
             top_n = 5
         ),
+        "milestones": analyser.get_milestones(parser.user_messages, parser.system_messages, parser.get_users(), parser.is_group()),
         # "message_date_time": {user: parser.get_date_time_by_user(user) for user in parser.get_users()},
     }
 
