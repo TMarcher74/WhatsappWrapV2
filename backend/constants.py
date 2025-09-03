@@ -9,12 +9,55 @@ class Tags(Enum):
     Analyse = "Analyse"
 
 # List of usable Gemini models
-class GeminiModels(Enum):
+class GeminiModels(str, Enum):
     G25Pro = "gemini-2.5-pro"
     G25Flash = "gemini-2.5-flash"
     G25FlashLite = "gemini-2.5-flash-lite"
     G20Flash = "gemini-2.0-flash"
     G20FlashLite = "gemini-2.0-flash-lite"
+
+class SysMsgActions(str, Enum):
+    CreateGroup = "created group"
+    AddUser = "added"
+    ChangeGrpDesc = "changed the group description"
+    ChangeGrpIcon = "changed this group's icon"
+    RemoveGrpIcon = "deleted this group's icon"
+    ChangeGrpName = "changed the group name from"
+    PinMsg = "pinned a message"
+    AddAdmin = "now an admin"
+    RemoveAdmin = "no longer an admin"
+
+ACTIONS = {
+    SysMsgActions.CreateGroup: lambda parts: {
+        "author": parts[0].strip(),
+    },
+    SysMsgActions.AddUser: lambda parts: {
+        "author": parts[0].strip(),
+        "added": parts[1].strip() if len(parts) > 1 else None,
+    },
+    SysMsgActions.ChangeGrpDesc: lambda parts: {
+        "author": parts[0].strip(),
+    },
+    SysMsgActions.ChangeGrpIcon: lambda parts: {
+        "author": parts[0].strip(),
+    },
+    SysMsgActions.RemoveGrpIcon: lambda parts: {
+        "author": parts[0].strip(),
+    },
+    SysMsgActions.ChangeGrpName: lambda parts: {
+        "author": parts[0].strip(),
+        "name_change": parts[1].strip() if len(parts) > 1 else None,
+    },
+    SysMsgActions.PinMsg: lambda parts: {
+        "author": parts[0].strip(),
+    },
+    SysMsgActions.AddAdmin: lambda parts: {
+        "author": parts[0].strip(),
+    },
+    SysMsgActions.RemoveAdmin: lambda parts: {
+        "author": parts[0].strip(),
+    },
+}
 
 DOMAIN_MAPS = {
     "youtube": ["youtube.com","m.youtube.com","youtu.be"],
@@ -28,8 +71,6 @@ DOMAIN_MAPS = {
     "canva": ["canva.com"],
     "chatgpt": ["chatgpt.com"],
     "discord": ["discord.com","discord.gg"],
-
-
 }
 
 
