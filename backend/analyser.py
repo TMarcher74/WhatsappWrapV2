@@ -1,6 +1,6 @@
 import datetime
 import re
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, time
 from typing import Union
 from xmlrpc.client import DateTime
 
@@ -14,9 +14,6 @@ from constants import DOMAIN_MAPS, SysMsgActions
 
 nltk.download('stopwords')
 custom_stopwords = {'media','omitted','message','deleted','edited','https','com'}
-
-class Analyser:
-    pass
 
 def get_most_used_words(messages, stop_words: bool = True, top_n: int = 10, min_length: int = 2):
     """
@@ -76,6 +73,9 @@ def get_media_sent_count(user_messages: dict) -> dict[str:int]:
     return get_messages_count(user_messages, media_message)
 
 def find_emoticons_dict(text):
+    """
+    Uses regex to identify text-based emoticons
+    """
     emoticons_pattern = re.compile(
     r"""(?<!\S)                           # no non-space before
     (?:
@@ -127,6 +127,10 @@ def get_emoji_emoticon_count(user_messages: dict) -> dict[str:list[int:dict[str:
     return emoji_counter, emoticon_counter
 
 def classify_url(raw_url: str) -> str:
+    """
+    Maps URL to avoid repeated entries
+    """
+
     try:
         parsed = urlparse(raw_url)
         domain = parsed.netloc.lower()
@@ -140,6 +144,9 @@ def classify_url(raw_url: str) -> str:
         return "other"
 
 def get_links(user_messages: dict):
+    """
+    Counts the urls and also returns all the links sent by a user
+    """
     url_pattern = re.compile(r"https?://\S+")
     url_count = {}
 
@@ -196,7 +203,22 @@ def get_top_convos(
         min_convo_time: int = 5,
         min_convo_length: int = 20,
         top_n: int = 5
-):
+) -> dict:
+    """
+
+    :param date_times: Takes in a list of datetime objects
+    :param messages: List of all the user messages
+    :param users: List of users in the chat
+    :param min_convo_time: Parameter for setting the minimum threshold
+    :param min_convo_length: Parameter for setting the maximum threshold
+    :param top_n: Parameter for returning the top_n number of convos
+    :return: A dictionary with:
+            Gap threshold (in seconds),
+            Longest convo,
+            Convo with the most no.of messages exchanged,
+            Convos ordered by messages per minute,
+            Convos ordered by messages per minute times unique participants per minute
+    """
     combined = sorted(zip(date_times, users, messages), key=lambda x: x[0])
     date_times, users, messages = zip(*combined)
 
@@ -266,16 +288,20 @@ def get_top_convos(
             most_messages_conversation = convo_stats
 
     return {
-        "gap_threshold_seconds": gap_thresh.total_seconds(),
+        "gap threshold in seconds": gap_thresh.total_seconds(),
         "Longest conversation": longest_conversation,
         "Most messages conversation": most_messages_conversation,
         f"Top {top_n} by messages / min":
             sorted(all_conversations, key=lambda x: x["messages_per_min"], reverse=True)[:top_n],
         f"Top {top_n} by messages / min * unique participants / min":
-            sorted(all_conversations, key=lambda x: x["messages_per_min"] * x["unique_participants_per_min"], reverse=True)[:top_n],
+            sorted(all_conversations,
+                   key=lambda x: x["messages_per_min"] * x["unique_participants_per_min"], reverse=True)[:top_n],
     }
 
 def get_longest_streak(dates: list[datetime.date]):
+    """
+    Gets the longest streak in days
+    """
     i, streak, count = 0, 0, 0
     streak_start, streak_end = 0, 0
     dates = list(set(dates))
@@ -289,29 +315,51 @@ def get_longest_streak(dates: list[datetime.date]):
         else:
             end = dates[i]
         if count > streak:
-            streak_start = start
-            streak_end = end
+            streak_start, streak_end = start, end
             streak = count
         i += 1
 
     return {"Streak start": streak_start, "Streak end": streak_end, "Streak in days":streak}
 
+def get_day_wise_freq(dates: list[datetime.date]) -> dict[str:int]:
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    day_counter = {"Monday":0, "Tuesday":0, "Wednesday":0, "Thursday":0, "Friday":0, "Saturday":0, "Sunday":0}
+    for date in dates:
+        day_counter[day_names[date.weekday()]] += 1
 
-def _to_datetime(date: datetime.date, time: datetime.time):
+    return day_counter
+
+def get_time_wise_freq(times: list[datetime.time]) -> dict[datetime.time:int]:
+    time_counter = Counter()
+    for time in times:
+        time_counter[time.hour] += 1
+
+    return dict(time_counter)
+
+def get_date_wise_freq(dates: list[datetime.date], top_n:int = None) -> dict[datetime.date:int]:
+    date_counter = Counter()
+    for date in dates:
+        date_counter[date] += 1
+
+    if top_n is None: return dict(date_counter)
+    return dict(date_counter.most_common(top_n))
+
+# All functions below are related to milestone function
+def _to_datetime(date: datetime.date, time: datetime.time = time(0,0,0)) -> datetime:
+    """
+    Combines date and time
+    """
     return datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
 
 def get_group_creation(system_messages: list[dict]):
     for msg in system_messages:
             if msg["action"] == SysMsgActions.CreateGroup:
-                return msg["date"], msg["time"], msg["author"], msg["action"]
+                return msg
 
 def get_nth_message(user_messages:list[dict], n: int):
     for i in range(1,len(user_messages)):
         if i==n:
-            return (user_messages[n]["date"],
-                    user_messages[n]["time"],
-                    user_messages[n]["sender"],
-                    user_messages[n]["message"])
+            return user_messages[n]
 
 def get_user_first_message(user_messages:list[dict], user: str):
     for msg in user_messages:
@@ -321,13 +369,15 @@ def get_user_first_message(user_messages:list[dict], user: str):
 def get_user_joins(user_messages:list[dict], system_messages: list[dict], user_list: list[str]):
     user_joins = {}
     mod_user_list = user_list.copy()
+    grp_created = get_group_creation(system_messages)
     for msg in system_messages:
         if msg["action"] == SysMsgActions.AddUser:
             if msg["added"] in mod_user_list:
                 user_joins.update({f"{msg["added"]}":_to_datetime(msg["date"], msg["time"])})
                 mod_user_list.remove(msg["added"])
         if msg["action"] == SysMsgActions.CreateGroup:
-            user_joins.update({f"{msg["author"]}": "Created the group, hence the first to join."})
+            # For the user who created the group
+            user_joins.update({f"{msg["author"]}": _to_datetime(grp_created["date"], grp_created["time"])})
             mod_user_list.remove(msg["author"])
 
 
@@ -335,10 +385,10 @@ def get_user_joins(user_messages:list[dict], system_messages: list[dict], user_l
         if user_joins.get(user) and hasattr(user_joins[user], "date"):
             # For those that joined before the group was created, set it as when the group was created
             if user_joins[user].date() > get_user_first_message(user_messages, user)["date"]:
-                user_joins[user] = "Joined before you, hence no log of it."
+                user_joins[user] = _to_datetime(grp_created["date"], grp_created["time"])
         elif user not in user_joins.keys():
-            date, time, _, _ = get_group_creation(system_messages)
-            user_joins[user] = _to_datetime(date, time)
+            # For the user who uploaded the log, since they will be addressed as "You" by the system
+            user_joins[user] = _to_datetime(grp_created["date"], grp_created["time"])
 
     user_joins = ((b,f"{a} has joined the chat") for a,b in user_joins.items())
     return user_joins
@@ -347,32 +397,39 @@ def get_milestones(
         user_messages:list[dict],
         system_messages:list[dict],
         user_list: list[str],
+        dates: list[datetime.date],
+        top_convos: dict,
+        streak: dict,
         is_group: bool
-):
+) -> list[tuple[str,str]]:
     """
-    Thinking of adding stuff like 
-    - When the group was created and by whom, done
-    - When each person of the group joined, all that stuff, done
-    - When each person sent their first message and what it was, done
-    - 100th / 1000th / 10000th message, done
-    - Most active day
-    - Longest convo
-    - Message spikes, unusually high traffic signals a big event
-    - X no.of days for next anniversary or since prev one
-    - ??
+    Covers these milestones:
+    - Group creation
+    - When each member joined
+    - Group name changes
+    - First message sent by each user
+    - Every 100th, 1000th, 10000th... message
+    - The day when most messages exchanged
+    - Longest convo in minutes
+    - Most messages sent in a convo
+    - Streak start and end
+
+    Sorts them by time and returns the datetime and the reason for milestone as tuple
     """
     grp_milestones = []
     chat_milestones = []
 
-    # date, time, sender, author, action, message = None, None, None, None, None, None
     if is_group:
         # Group creation
-        date, time, author, action = get_group_creation(system_messages)
-        grp_milestones.append((_to_datetime(date, time), f"The group was created by {author}"))
+        _ = get_group_creation(system_messages)
+        grp_milestones.append((_to_datetime(_["date"], _["time"]), f"The group {_["name"]} was created by {_["author"]}"))
 
         #When each member joined
-        for _ in get_user_joins(user_messages, system_messages, user_list):
-            grp_milestones.append(_)
+        for _ in get_user_joins(user_messages, system_messages, user_list): grp_milestones.append(_)
+
+        # Group name changes
+        for _ in [msg for msg in system_messages if msg["action"] == SysMsgActions.ChangeGrpName or msg["action"] == SysMsgActions.ChangeGrpName]:
+            grp_milestones.append((_to_datetime(_["date"], _["time"]), f"The group name was changed from {_["name_change"]} by {_["author"]}"))
 
     # First message sent by each user
     for user in user_list:
@@ -383,21 +440,42 @@ def get_milestones(
     # Add every 100th, 1000th, 10000th... message to the milestone
     i=99
     while i <= len(user_messages):
-        date, time, sender, message = get_nth_message(user_messages, i)
-        chat_milestones.append((_to_datetime(date, time), f"The {i}th message was sent by {sender} : {message}"))
+        _ = get_nth_message(user_messages, i)
+        chat_milestones.append((_to_datetime(_["date"], _["time"]), f"The {i}th message was sent by {_["sender"]} : {_["message"]}"))
         if i % 10 == 1:
             i-=1
             i*=10
             i-=1
         else: i+=1
 
+    # Day with the most messages is added
+    most_active_day, count = next(iter(get_date_wise_freq(dates, 1).items()))
+    chat_milestones.append((_to_datetime(most_active_day), f"{count} messages were exchanged in a single day, the highest in this chat's history!"))
+
+    # Longest convo
+    longest_convo = top_convos["Longest conversation"]
+    chat_milestones.append((longest_convo["start"],
+                            f"Had the longest conversation that lasted for {longest_convo["duration_min"]} minutes and "
+                            f"exchanged over {longest_convo["messages"]} messages!"))
+
+    # Most messages sent in a convo
+    most_messages_convo = top_convos["Most messages conversation"]
+    # If the longest convo is same as most messages sent then skip
+    if longest_convo["start"] != most_messages_convo["start"]:
+        chat_milestones.append((most_messages_convo["start"],
+                            f"Had a conversation where you exchanged over {most_messages_convo["messages"]} messages "
+                            f"that lasted {most_messages_convo["duration_min"]} minutes."))
+
+    # Longest streak
+    chat_milestones.append((_to_datetime(streak["Streak start"]),
+                            f"From today for the next {streak["Streak in days"]} days, at least a single message is exchanged!"))
+    chat_milestones.append((_to_datetime(streak["Streak end"]), f"The {streak["Streak in days"]} day streak ended today."))
+
     for _ in grp_milestones:
         chat_milestones.append(_)
 
+    chat_milestones = sorted(chat_milestones, key = lambda x: x[0])
+
     return chat_milestones
 
-def get_day_wise_frequency():
-    pass
 
-def get_time_wise_frequency():
-    pass

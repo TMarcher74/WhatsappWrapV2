@@ -30,6 +30,7 @@ class SysMsgActions(str, Enum):
 ACTIONS = {
     SysMsgActions.CreateGroup: lambda parts: {
         "author": parts[0].strip(),
+        "name":  parts[1].strip()
     },
     SysMsgActions.AddUser: lambda parts: {
         "author": parts[0].strip(),

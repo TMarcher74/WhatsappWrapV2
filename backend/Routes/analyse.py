@@ -52,16 +52,33 @@ async def anlayse_chat(
         "top_words": analyser.get_most_used_words(parser.get_messages_by_user(), stop_words = True, top_n = 30, min_length = 2),
         "emoji_count": analyser.get_emoji_emoticon_count(user_messages),
         "longest_streak": analyser.get_longest_streak(parser.get_date_by_user()),
+        "day_frequency": analyser.get_day_wise_freq(parser.get_dates()),
+        "time_frequency": analyser.get_time_wise_freq(parser.get_time()),
+        "date_frequency": analyser.get_date_wise_freq(parser.get_dates()),
+        "user_wise_day_frequency": {user: analyser.get_day_wise_freq(parser.get_date_by_user(user)) for user in parser.get_users()},
+        "user_wise_time_frequency": {user: analyser.get_time_wise_freq(parser.get_time_by_user(user)) for user in parser.get_users()},
+        "milestones": analyser.get_milestones(
+            parser.user_messages,
+            parser.system_messages,
+            parser.get_users(),
+            parser.get_dates(),
+            analyser.get_top_convos(parser.get_date_time_by_user(),parser.get_messages_by_user(),parser.get_users_wrt_messages(),
+                min_convo_time=5,
+                min_convo_length=20,
+                top_n=5
+            ),
+            analyser.get_longest_streak(parser.get_date_by_user()),
+            parser.is_group(),
+        ),
         "convos": analyser.get_top_convos(
             parser.get_date_time_by_user(),
             parser.get_messages_by_user(),
             parser.get_users_wrt_messages(),
-            min_convo_time = 5,
-            min_convo_length = 20,
-            top_n = 5
+            min_convo_time=5,
+            min_convo_length=20,
+            top_n=5
         ),
-        "milestones": analyser.get_milestones(parser.user_messages, parser.system_messages, parser.get_users(), parser.is_group()),
-        # "message_date_time": {user: parser.get_date_time_by_user(user) for user in parser.get_users()},
+
     }
 
     return analysis
