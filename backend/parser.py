@@ -41,7 +41,7 @@ class Parser:
                 continue
             m = entry_re.match(chunk)
             if not m:
-                #chunk didn't match the expected entry format; treat as system text
+                #chunk didn't match the expected entry format, treat as system text
                 system_messages.append({
                     "date": None,
                     "time": None,
@@ -88,23 +88,11 @@ class Parser:
         if len(self.get_users()) > 2: return True
         return False
 
-    def get_dates(self) -> list[datetime.date]:
-        """
-        Get formated dates for all the messages
-        """
-        return [msg["date"] for msg in self.user_messages]
-
-    def get_time(self) -> list[datetime.time]:
-        """
-        Get formated time for all the messages
-        """
-        return [msg["time"] for msg in self.user_messages]
-
     def get_users_wrt_messages(self) -> list[str]:
         """
         Gets the usernames with respect to each message
         """
-        return list(msg["sender"] for msg in self.user_messages if msg["sender"] != "Meta AI")
+        return list(msg["sender"] for msg in self.user_messages)
 
     def get_users(self) -> list[str]:
         """

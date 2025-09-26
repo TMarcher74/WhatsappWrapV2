@@ -7,12 +7,14 @@ Routes:
 """
 
 from fastapi import FastAPI
-from Routes import status, analyse
+from Routes import status, analyse, upload
 import uvicorn
 
 app = FastAPI()
 app.include_router(status.router)
+app.include_router(upload.router)
 app.include_router(analyse.router)
+
 
 # Backend start here, run main to run backend
 if __name__ == '__main__':

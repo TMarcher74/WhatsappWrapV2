@@ -1,8 +1,9 @@
 import datetime
 import re
 from datetime import timedelta, datetime, time
+from http.client import HTTPException
 from typing import Union
-from xmlrpc.client import DateTime
+
 
 from emoji import is_emoji
 import nltk
@@ -77,7 +78,7 @@ def find_emoticons_dict(text):
     Uses regex to identify text-based emoticons
     """
     emoticons_pattern = re.compile(
-    r"""(?<!\S)                           # no non-space before
+    r"""(?<!\S)         # no non-space before
     (?:
         [:=;]-?[\)DPO3/\\]     # :) :-) :D :-D :P :-P :3 :-3 :/ :-/
       | [:=]-?\(               # :( :-(
@@ -160,7 +161,7 @@ def get_links(user_messages: dict):
                 urls.append(raw_url)
                 count[platform] += 1
         sorted_count = dict(sorted(count.items(), key=lambda x: x[1], reverse=True))
-        url_count[user] = [sorted_count,urls]
+        url_count[user] = [sorted_count]
 
     return url_count
 
@@ -219,6 +220,9 @@ def get_top_convos(
             Convos ordered by messages per minute,
             Convos ordered by messages per minute times unique participants per minute
     """
+
+    if len(date_times) != len(messages) != len(users):
+        return {"Error": "Length of dates, messages and users list do not match!"}
     combined = sorted(zip(date_times, users, messages), key=lambda x: x[0])
     date_times, users, messages = zip(*combined)
 
@@ -302,24 +306,26 @@ def get_longest_streak(dates: list[datetime.date]):
     """
     Gets the longest streak in days
     """
-    i, streak, count = 0, 0, 0
-    streak_start, streak_end = 0, 0
-    dates = list(set(dates))
-    dates.sort()
-    while i in range(0,len(dates)-1):
-        count = 0
-        start = dates[i]
-        while dates[i+1] - dates[i] <= timedelta(days=1):
+    dates = sorted(set(dates))
+    streak = count = 1
+    streak_start = streak_end = dates[0]
+    temp_start = dates[0]
+    for i in range(len(dates) - 1):
+        if dates[i + 1] - dates[i] <= timedelta(days=1):
             count += 1
-            i += 1
+            if count > streak:
+                streak = count
+                streak_start = temp_start
+                streak_end = dates[i + 1]
         else:
-            end = dates[i]
-        if count > streak:
-            streak_start, streak_end = start, end
-            streak = count
-        i += 1
+            count = 1
+            temp_start = dates[i + 1]
 
-    return {"Streak start": streak_start, "Streak end": streak_end, "Streak in days":streak}
+    return {
+        "Streak start": streak_start,
+        "Streak end": streak_end,
+        "Streak in days": streak
+    }
 
 def get_day_wise_freq(dates: list[datetime.date]) -> dict[str:int]:
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]

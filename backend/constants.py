@@ -1,4 +1,8 @@
 from enum import Enum
+from cachetools import TTLCache
+
+# Chat data is temp stored in cache and cleared after 10 min
+file_cache = TTLCache(maxsize=100, ttl=600)
 
 # Whatsapp max export size currently is 18MB
 MAX_UPLOAD_FILE_SIZE = 18874368
@@ -6,7 +10,11 @@ MAX_UPLOAD_FILE_SIZE = 18874368
 # Tags for different routes and paths
 class Tags(Enum):
     Status = "Status"
-    Analyse = "Analyse"
+    Upload = "Upload"
+    Analyse_Users = "Analyse Users"
+    Analyse_Messages = "Analyse Messages"
+    Analyse_Time = "Analyse Time"
+    Analyse_Events = "Analyse Events"
 
 # List of usable Gemini models
 class GeminiModels(str, Enum):

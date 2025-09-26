@@ -1,47 +1,188 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
-
-from constants import Tags, MAX_UPLOAD_FILE_SIZE
+from constants import Tags, MAX_UPLOAD_FILE_SIZE, file_cache
+from fastapi.params import Query
 from parser import Parser
 import analyser
 
+router = APIRouter(prefix="/analyse")
 
-router = APIRouter()
+def verify_parsed_data(file_id: str):
+    parsed_data = file_cache.get(file_id)
+    if not parsed_data:
+        print(file_cache)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File expired or not found"
+        )
+    return parsed_data
 
-@router.post("/analyse", tags=[Tags.Analyse])
-async def anlayse_chat(
-        file: UploadFile = File(...)
+def get_user_messages(parsed_data: Parser):
+    user_messages = {
+        user: parsed_data.get_messages_by_user(user)
+        for user in parsed_data.get_users()
+    }
+    return user_messages
+
+# Users
+@router.get("/users/{file_id}", tags=[Tags.Analyse_Users])
+async def get_users(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    return {"users": parsed_data.get_users(),}
+
+# Messages
+@router.get("/messages/{file_id}/total", tags=[Tags.Analyse_Messages])
+async def get_total_messages(file_id: str):
+    parsed_data = file_cache.get(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"total_messages": analyser.get_messages_count(user_messages),}
+
+@router.get("/messages/{file_id}/stats", tags=[Tags.Analyse_Messages])
+async def get_message_stats(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"word_char_stats": analyser.get_word_char_stats(user_messages),}
+
+@router.get("/messages/{file_id}/deleted", tags=[Tags.Analyse_Messages])
+async def get_deleted_messages(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"deleted_messages": analyser.get_messages_deleted_count(user_messages),}
+
+@router.get("/messages/{file_id}/edited", tags=[Tags.Analyse_Messages])
+async def get_edited_messages(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"edited_messages": analyser.get_messages_edited_count(user_messages),}
+
+@router.get("/messages/{file_id}/media", tags=[Tags.Analyse_Messages])
+async def get_media(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"media": analyser.get_media_sent_count(user_messages),}
+
+@router.get("/messages/{file_id}/links", tags=[Tags.Analyse_Messages])
+async def get_links(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"links": analyser.get_links(user_messages),}
+
+@router.get("/messages/{file_id}/emojis-emoticons", tags=[Tags.Analyse_Messages])
+async def get_emojis_emoticons(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"emoji_emoticon_count": analyser.get_emoji_emoticon_count(user_messages),}
+
+@router.get("/messages/{file_id}/top_words", tags=[Tags.Analyse_Messages])
+async def get_top_words(
+        file_id: str,
+        top_n: int = Query(30, ge = 1, le = 100, description = "Number of top words to return"),
+        min_length: int = Query(2, ge = 1, description = "Minimum word length to include"),
+        stop_words: bool = Query(True, description = "Whether to exclude stopwords")
 ):
-    # validate file
-    if file.content_type != "text/plain":
-        raise HTTPException(
-            status_code = status.HTTP_406_NOT_ACCEPTABLE,
-            detail = "Wrong file type uploaded, only text files are accepted"
+    parsed_data = verify_parsed_data(file_id)
+    return {"top_words": analyser.get_most_used_words(parsed_data.get_messages_by_user(), stop_words, top_n, min_length),}
+
+# Time
+@router.get("/time/{file_id}/streak", tags=[Tags.Analyse_Time])
+async def get_longest_streak(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    return {"longest_streak": analyser.get_longest_streak(parsed_data.get_date_by_user()),}
+
+@router.get("/time/{file_id}/day-frequency", tags=[Tags.Analyse_Time])
+async def get_day_freq(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
+    parsed_data = verify_parsed_data(file_id)
+    if user_wise: return {"day_frequency": {user: analyser.get_day_wise_freq(parsed_data.get_date_by_user(user))
+                                            for user in parsed_data.get_users()}},
+    return {"day_frequency": analyser.get_day_wise_freq(parsed_data.get_date_by_user()),}
+
+@router.get("/time/{file_id}/date-frequency", tags=[Tags.Analyse_Time])
+async def get_date_freq(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
+    parsed_data = verify_parsed_data(file_id)
+    if user_wise: return {"date_frequency": {user: analyser.get_date_wise_freq(parsed_data.get_date_by_user(user))
+                                            for user in parsed_data.get_users()}},
+    return {"date_frequency": analyser.get_date_wise_freq(parsed_data.get_date_by_user()),}
+
+@router.get("/time/{file_id}/time-frequency", tags=[Tags.Analyse_Time])
+async def get_time_freq(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
+    parsed_data = verify_parsed_data(file_id)
+    if user_wise: return {"date_frequency": {user: analyser.get_time_wise_freq(parsed_data.get_time_by_user(user))
+                                             for user in parsed_data.get_users()}},
+    return {"time_frequency": analyser.get_time_wise_freq(parsed_data.get_time_by_user()),}
+
+# Events
+@router.get("/events/{file_id}/milestones", tags=[Tags.Analyse_Events])
+async def get_milestones(
+        file_id: str,
+        min_convo_time: int = Query(5, ge=1, description= "Minimum conversation time in min"),
+        min_convo_length: int = Query(20, ge=1, description= "Minimum number of messages"),
+        top_n: int = Query(5, ge=1, description= "Returns top n number of convos")
+):
+    parsed_data = verify_parsed_data(file_id)
+    return {
+        "milestones":
+        analyser.get_milestones(
+            parsed_data.user_messages,
+            parsed_data.system_messages,
+            parsed_data.get_users(),
+            parsed_data.get_date_by_user(),
+            analyser.get_top_convos(
+                parsed_data.get_date_time_by_user(),
+                parsed_data.get_messages_by_user(),
+                parsed_data.get_users_wrt_messages(),
+                min_convo_time,
+                min_convo_length,
+                top_n
+            ),
+            analyser.get_longest_streak(parsed_data.get_date_by_user()),
+            parsed_data.is_group(),
         )
-    if file.size > MAX_UPLOAD_FILE_SIZE:
-        raise HTTPException(
-            status_code = status.HTTP_406_NOT_ACCEPTABLE,
-            detail = "File size exceeds 18MB"
+    }
+
+@router.get("/events/{file_id}/top-convos", tags=[Tags.Analyse_Events])
+async def get_top_convos(
+        file_id: str,
+        min_convo_time: int = Query(5, ge=1, description= "Minimum conversation time in min"),
+        min_convo_length: int = Query(20, ge=1, description= "Minimum number of messages"),
+        top_n: int = Query(5, ge=1, description= "Returns top n number of convos")
+):
+    parsed_data = verify_parsed_data(file_id)
+    return {
+        "top_convos":
+        analyser.get_top_convos(
+            parsed_data.get_date_time_by_user(),
+            parsed_data.get_messages_by_user(),
+            parsed_data.get_users_wrt_messages(),
+            min_convo_time,
+            min_convo_length,
+            top_n
         )
+    }
 
-    raw_bytes = await file.read()
-    chat_text = raw_bytes.decode("utf-8")  #, errors="ignore")
-    
-    # Sanitise data, remove names
 
-    # Send it to AI
 
-    # Send it to parser
-    parser = Parser(chat_text)
+@router.post("/all/{file_id}")
+async def anlayse_all(file_id: str):
+    # Retrieve parsed data from cache
+    parsed_data = verify_parsed_data(file_id)
 
     # Organize messages by user
     user_messages = {
-        user: parser.get_messages_by_user(user)
-        for user in parser.get_users()
+        user: parsed_data.get_messages_by_user(user)
+        for user in parsed_data.get_users()
     }
 
     # Run analysis
     analysis = {
-        "users": parser.get_users(),
+        "users": parsed_data.get_users(),
         "total_messages": analyser.get_messages_count(user_messages),
         "word_character_stats": analyser.get_word_char_stats(user_messages),
         # "sum_of_total_messages":len(parser.get_messages()),
@@ -49,36 +190,35 @@ async def anlayse_chat(
         "edited_messages": analyser.get_messages_edited_count(user_messages),
         "media": analyser.get_media_sent_count(user_messages),
         "links": analyser.get_links(user_messages),
-        "top_words": analyser.get_most_used_words(parser.get_messages_by_user(), stop_words = True, top_n = 30, min_length = 2),
+        "top_words": analyser.get_most_used_words(parsed_data.get_messages_by_user(), stop_words = True, top_n = 30, min_length = 2),
         "emoji_count": analyser.get_emoji_emoticon_count(user_messages),
-        "longest_streak": analyser.get_longest_streak(parser.get_date_by_user()),
-        "day_frequency": analyser.get_day_wise_freq(parser.get_dates()),
-        "time_frequency": analyser.get_time_wise_freq(parser.get_time()),
-        "date_frequency": analyser.get_date_wise_freq(parser.get_dates()),
-        "user_wise_day_frequency": {user: analyser.get_day_wise_freq(parser.get_date_by_user(user)) for user in parser.get_users()},
-        "user_wise_time_frequency": {user: analyser.get_time_wise_freq(parser.get_time_by_user(user)) for user in parser.get_users()},
+        "longest_streak": analyser.get_longest_streak(parsed_data.get_date_by_user()),
+        "day_frequency": analyser.get_day_wise_freq(parsed_data.get_date_by_user()),
+        "time_frequency": analyser.get_time_wise_freq(parsed_data.get_time_by_user()),
+        "date_frequency": analyser.get_date_wise_freq(parsed_data.get_date_by_user()),
+        "user_wise_day_frequency": {user: analyser.get_day_wise_freq(parsed_data.get_date_by_user(user)) for user in parsed_data.get_users()},
+        "user_wise_time_frequency": {user: analyser.get_time_wise_freq(parsed_data.get_time_by_user(user)) for user in parsed_data.get_users()},
         "milestones": analyser.get_milestones(
-            parser.user_messages,
-            parser.system_messages,
-            parser.get_users(),
-            parser.get_dates(),
-            analyser.get_top_convos(parser.get_date_time_by_user(),parser.get_messages_by_user(),parser.get_users_wrt_messages(),
+            parsed_data.user_messages,
+            parsed_data.system_messages,
+            parsed_data.get_users(),
+            parsed_data.get_date_by_user(),
+            analyser.get_top_convos(parsed_data.get_date_time_by_user(),parsed_data.get_messages_by_user(),parsed_data.get_users_wrt_messages(),
                 min_convo_time=5,
                 min_convo_length=20,
                 top_n=5
             ),
-            analyser.get_longest_streak(parser.get_date_by_user()),
-            parser.is_group(),
+            analyser.get_longest_streak(parsed_data.get_date_by_user()),
+            parsed_data.is_group(),
         ),
         "convos": analyser.get_top_convos(
-            parser.get_date_time_by_user(),
-            parser.get_messages_by_user(),
-            parser.get_users_wrt_messages(),
-            min_convo_time=5,
-            min_convo_length=20,
-            top_n=5
+            parsed_data.get_date_time_by_user(),
+            parsed_data.get_messages_by_user(),
+            parsed_data.get_users_wrt_messages(),
+                min_convo_time=5,
+                min_convo_length=20,
+                top_n=5
         ),
-
     }
 
     return analysis
