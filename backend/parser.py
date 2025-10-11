@@ -92,7 +92,7 @@ class Parser:
         """
         Gets the usernames with respect to each message
         """
-        return list(msg["sender"] for msg in self.user_messages)
+        return list(msg["sender"] for msg in self.user_messages if msg["sender"] != "Meta AI")
 
     def get_users(self) -> list[str]:
         """

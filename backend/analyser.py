@@ -1,10 +1,6 @@
 import datetime
 import re
 from datetime import timedelta, datetime, time
-from http.client import HTTPException
-from typing import Union
-
-
 from emoji import is_emoji
 import nltk
 from nltk.corpus import stopwords
@@ -12,6 +8,7 @@ from collections import Counter, defaultdict
 import statistics
 from urllib.parse import urlparse
 from constants import DOMAIN_MAPS, SysMsgActions
+from math import sqrt
 
 nltk.download('stopwords')
 custom_stopwords = {'media','omitted','message','deleted','edited','https','com'}
@@ -29,7 +26,13 @@ def get_most_used_words(messages, stop_words: bool = True, top_n: int = 10, min_
         word_counter.update(filtered_words)
     return dict(word_counter.most_common(top_n))
 
-def get_messages_count(user_messages: dict, check_strings: Union[str, list[str]] = None) -> dict[str, int]:
+def get_ratioed(total_messages: dict[str,int], count: dict[str,int]):
+    for user, total_message_count in total_messages.items():
+        count[user] = [count.get(user), f"1 in {round(total_message_count/count.get(user)) if total_message_count*count.get(user) != 0 else 0}"]
+
+    return count
+
+def get_messages_count(user_messages: dict, check_strings: str | list[str] = None) -> dict[str, int]:
     if isinstance(check_strings, str):
         check_strings = [check_strings]
 
@@ -149,21 +152,24 @@ def get_links(user_messages: dict):
     Counts the urls and also returns all the links sent by a user
     """
     url_pattern = re.compile(r"https?://\S+")
-    url_count = {}
+    url_count, detailed_url_count = {}, {}
 
     for user, messages in user_messages.items():
         urls = []
         count = defaultdict(int)
+        total_count = 0
         for msg in messages:
             found_urls = url_pattern.findall(msg)
             for raw_url in found_urls:
                 platform = classify_url(raw_url)
                 urls.append(raw_url)
                 count[platform] += 1
+                total_count += 1
         sorted_count = dict(sorted(count.items(), key=lambda x: x[1], reverse=True))
-        url_count[user] = [sorted_count]
+        url_count[user] = total_count
+        detailed_url_count[user] = [sorted_count, urls]
 
-    return url_count
+    return url_count, detailed_url_count
 
 def get_word_char_stats(user_messages: dict):
     """
@@ -349,6 +355,44 @@ def get_date_wise_freq(dates: list[datetime.date], top_n:int = None) -> dict[dat
 
     if top_n is None: return dict(date_counter)
     return dict(date_counter.most_common(top_n))
+
+def get_user_reply_map(users_wrt_messages: list[str]) -> dict[str, dict[str, int]]:
+    reply_map = defaultdict(lambda: defaultdict(int))
+
+    for i in range(1, len(users_wrt_messages)):
+        prev_user = users_wrt_messages[i - 1]
+        cur_user = users_wrt_messages[i]
+        if prev_user != cur_user:
+            # Avoid elf replies
+            reply_map[cur_user][prev_user] += 1
+
+    return {user: dict(replies) for user, replies in reply_map.items()}
+
+def normalise_reply_map(
+        reply_map: dict[str, dict[str, int]],
+        total_messages: dict[str, int]
+):
+    interaction_strength = defaultdict(dict)
+
+    # Symmetric interaction strength - how strong mutual communication is
+    users = set(reply_map.keys()) | set(total_messages.keys())
+    for a in users:
+        for b in users:
+            if a == b:
+                continue
+            a_b = reply_map.get(a, {}).get(b, 0)
+            b_a = reply_map.get(b, {}).get(a, 0)
+            total_a = total_messages.get(a, 1)
+            total_b = total_messages.get(b, 1)
+            score = (a_b + b_a) / sqrt(total_a * total_b)
+            if score > 0:
+                interaction_strength[a][b] = round(score, 3)
+
+    return {
+        "raw": reply_map,
+        "interaction_strength": dict(interaction_strength),
+    }
+
 
 # All functions below are related to milestone function
 def _to_datetime(date: datetime.date, time: datetime.time = time(0,0,0)) -> datetime:

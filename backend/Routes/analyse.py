@@ -32,7 +32,7 @@ async def get_users(file_id: str):
 # Messages
 @router.get("/messages/{file_id}/total", tags=[Tags.Analyse_Messages])
 async def get_total_messages(file_id: str):
-    parsed_data = file_cache.get(file_id)
+    parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
     return {"total_messages": analyser.get_messages_count(user_messages),}
 
@@ -46,25 +46,31 @@ async def get_message_stats(file_id: str):
 async def get_deleted_messages(file_id: str):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"deleted_messages": analyser.get_messages_deleted_count(user_messages),}
+    return {"deleted_messages": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                                     analyser.get_messages_deleted_count(user_messages)),}
 
 @router.get("/messages/{file_id}/edited", tags=[Tags.Analyse_Messages])
 async def get_edited_messages(file_id: str):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"edited_messages": analyser.get_messages_edited_count(user_messages),}
+    return {"edited_messages": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                                    analyser.get_messages_edited_count(user_messages)),}
 
 @router.get("/messages/{file_id}/media", tags=[Tags.Analyse_Messages])
 async def get_media(file_id: str):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"media": analyser.get_media_sent_count(user_messages),}
+    return {"media": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                          analyser.get_media_sent_count(user_messages)),}
 
 @router.get("/messages/{file_id}/links", tags=[Tags.Analyse_Messages])
 async def get_links(file_id: str):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"links": analyser.get_links(user_messages),}
+    url_count, detailed_url_count = analyser.get_links(user_messages)
+    return {"url_count": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                              url_count),
+            "detailed_url_count": detailed_url_count}
 
 @router.get("/messages/{file_id}/emojis-emoticons", tags=[Tags.Analyse_Messages])
 async def get_emojis_emoticons(file_id: str):
@@ -167,6 +173,12 @@ async def get_top_convos(
         )
     }
 
+@router.get("/events/{file_id}/responses", tags=[Tags.Analyse_Events])
+async def get_responses(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"response_map": analyser.normalise_reply_map(analyser.get_user_reply_map(parsed_data.get_users_wrt_messages()),
+                                                         analyser.get_messages_count(user_messages))}
 
 
 @router.post("/all/{file_id}")
