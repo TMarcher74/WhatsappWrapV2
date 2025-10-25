@@ -112,7 +112,7 @@ async def get_date_freq(
     parsed_data = verify_parsed_data(file_id)
     if user_wise: return {"date_frequency": {user: analyser.get_date_wise_freq(parsed_data.get_date_by_user(user))
                                             for user in parsed_data.get_users()}},
-    return {"date_frequency": analyser.get_date_wise_freq(parsed_data.get_date_by_user()),}
+    return {"date_frequency": analyser.get_date_wise_freq(parsed_data.get_date_by_user())}
 
 @router.get("/time/{file_id}/time-frequency", tags=[Tags.Analyse_Time])
 async def get_time_freq(
@@ -123,6 +123,18 @@ async def get_time_freq(
     if user_wise: return {"date_frequency": {user: analyser.get_time_wise_freq(parsed_data.get_time_by_user(user))
                                              for user in parsed_data.get_users()}},
     return {"time_frequency": analyser.get_time_wise_freq(parsed_data.get_time_by_user()),}
+
+@router.get("/time/{file_id}/detailed-date-frequency", tags=[Tags.Analyse_Time])
+async def get_detailed_date_freq(
+        file_id: str,
+):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = {
+        user: parsed_data.get_date_and_messages_by_user(user)
+        for user in parsed_data.get_users()
+    }
+
+    return {"date_frequency": analyser.get_detailed_timeseries(parsed_data.get_date_by_user(), user_messages),}
 
 # Events
 @router.get("/events/{file_id}/milestones", tags=[Tags.Analyse_Events])

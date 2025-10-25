@@ -111,7 +111,7 @@ def get_emoji_emoticon_count(user_messages: dict) -> dict[str:list[int:dict[str:
     """
     Get the count of emojis sent by a user
     """
-    emoji_counter, emoticon_counter = {}, {}
+    emoji_counter, emoticon_counter, emojis_emoticons_used = {}, {}, {}
     for user, messages in user_messages.items():
         emoji_count = 0
         emoji_freq = Counter()
@@ -125,10 +125,11 @@ def get_emoji_emoticon_count(user_messages: dict) -> dict[str:list[int:dict[str:
             a, b = find_emoticons_dict(msg)
             emoticon_count += a
             emoticon_freq.update(b)
-        emoji_counter[user] = [emoji_count, dict(emoji_freq.most_common())]
-        emoticon_counter[user] = [emoticon_count, dict(emoticon_freq.most_common())]
+        emoji_counter[user] = emoji_count
+        emoticon_counter[user] = emoticon_count
+        emojis_emoticons_used[user] = [dict(emoji_freq.most_common()), dict(emoticon_freq.most_common())]
 
-    return emoji_counter, emoticon_counter
+    return emoji_counter, emoticon_counter, emojis_emoticons_used
 
 def classify_url(raw_url: str) -> str:
     """
@@ -177,13 +178,14 @@ def get_word_char_stats(user_messages: dict):
     """
     wc_stats = {}
     for user, messages in user_messages.items():
-        w_count, c_count = 0,0
+        m_count, w_count, c_count = 0,0,0
         words, chars = [], []
         for msg in messages:
             w_count += len(msg.split())
             c_count += len(msg)
             words.append(len(msg.split()))
             chars.append(len(msg))
+            m_count+=1
         w_median = statistics.median(words)
         w_mean = int(statistics.mean(words))
         w_mode = statistics.mode(words)
@@ -191,8 +193,12 @@ def get_word_char_stats(user_messages: dict):
         c_mean = int(statistics.mean(chars))
         c_mode = statistics.mode(chars)
         wc_stats[user] = {
+            "messages": m_count,
             "words": w_count,
-            "characters":c_count,
+            "characters": c_count,
+            "characters/word": round(c_count/w_count,2) if w_count != 0 else None,
+            "words/message": round(w_count/m_count,2) if m_count != 0 else None,
+            "characters/message": round(c_count/m_count,2) if m_count != 0 else None,
             "word_median": w_median,
             "word_mean":w_mean,
             "word_mode": w_mode,
@@ -355,6 +361,28 @@ def get_date_wise_freq(dates: list[datetime.date], top_n:int = None) -> dict[dat
 
     if top_n is None: return dict(date_counter)
     return dict(date_counter.most_common(top_n))
+
+def get_detailed_timeseries(dates: list[datetime.date], user_messages:dict) -> dict[datetime.date:list[int,int]]:
+    counter = defaultdict(lambda: defaultdict(lambda: {"stats": {}, "deleted": 0, "edited": 0, "media": 0, "links": 0, "emojis": 0, "emoticons": 0}))
+
+    for user, dict_ in user_messages.items():
+        for date, messages_ in dict_.items():
+
+            stats = get_word_char_stats({user: messages_})
+            deleted = get_messages_deleted_count({user: messages_})
+            edited = get_messages_edited_count({user: messages_})
+            media = get_media_sent_count({user: messages_})
+            links = get_links({user: messages_})[0]
+            emojis = get_emoji_emoticon_count({user: messages_})[0]
+            emoticons = get_emoji_emoticon_count({user: messages_})[1]
+            for label, dic in zip(["stats", "deleted", "edited", "media", "links", "emojis", "emoticons"],
+                                  [stats, deleted, edited, media, links, emojis, emoticons]):
+                for _, v in dic.items():
+                    if isinstance(v, dict):
+                        counter[date][user][label].update(v)
+                    else: counter[date][user][label] += v
+
+    return counter
 
 def get_user_reply_map(users_wrt_messages: list[str]) -> dict[str, dict[str, int]]:
     reply_map = defaultdict(lambda: defaultdict(int))

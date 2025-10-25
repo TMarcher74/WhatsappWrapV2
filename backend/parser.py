@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 import re
 from constants import ACTIONS
@@ -108,6 +109,20 @@ class Parser:
         if user is None:
             return [msg["message"] for msg in self.user_messages]
         return [msg["message"] for msg in self.user_messages if msg["sender"] == user]
+
+    def get_date_and_messages_by_user(self, user:str = None) -> dict[datetime.date, list[str]]:
+        """
+        Get messages sent by a user
+        """
+        grouped = defaultdict(list)
+        if user is None:
+            for msg in self.user_messages:
+                grouped[msg["date"]].append(msg["message"])
+            return dict(grouped)
+        for msg in self.user_messages:
+            if msg["sender"] == user:
+                grouped[msg["date"]].append(msg["message"])
+        return dict(grouped)
 
     def get_date_time_by_user(self, user:str = None) -> list[datetime]:
         """
