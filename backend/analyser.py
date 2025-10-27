@@ -196,9 +196,9 @@ def get_word_char_stats(user_messages: dict):
             "messages": m_count,
             "words": w_count,
             "characters": c_count,
-            "characters/word": round(c_count/w_count,2) if w_count != 0 else None,
-            "words/message": round(w_count/m_count,2) if m_count != 0 else None,
-            "characters/message": round(c_count/m_count,2) if m_count != 0 else None,
+            "characters/word": round(c_count/w_count,2) if w_count != 0 else 0,
+            "words/message": round(w_count/m_count,2) if m_count != 0 else 0,
+            "characters/message": round(c_count/m_count,2) if m_count != 0 else 0,
             "word_median": w_median,
             "word_mean":w_mean,
             "word_mode": w_mode,
@@ -363,24 +363,38 @@ def get_date_wise_freq(dates: list[datetime.date], top_n:int = None) -> dict[dat
     return dict(date_counter.most_common(top_n))
 
 def get_detailed_timeseries(dates: list[datetime.date], user_messages:dict) -> dict[datetime.date:list[int,int]]:
-    counter = defaultdict(lambda: defaultdict(lambda: {"stats": {}, "deleted": 0, "edited": 0, "media": 0, "links": 0, "emojis": 0, "emoticons": 0}))
+    counter = defaultdict(lambda: defaultdict(lambda: {"messages": 0,
+                                                       "words": 0,
+                                                       "characters": 0,
+                                                       "characters/word": 0,
+                                                       "words/message": 0,
+                                                       "characters/message": 0,
+                                                       "deleted": 0,
+                                                       "edited": 0,
+                                                       "media": 0,
+                                                       "links": 0,
+                                                       "emojis": 0,
+                                                       "emoticons": 0}))
 
     for user, dict_ in user_messages.items():
         for date, messages_ in dict_.items():
 
             stats = get_word_char_stats({user: messages_})
-            deleted = get_messages_deleted_count({user: messages_})
-            edited = get_messages_edited_count({user: messages_})
-            media = get_media_sent_count({user: messages_})
-            links = get_links({user: messages_})[0]
-            emojis = get_emoji_emoticon_count({user: messages_})[0]
-            emoticons = get_emoji_emoticon_count({user: messages_})[1]
-            for label, dic in zip(["stats", "deleted", "edited", "media", "links", "emojis", "emoticons"],
-                                  [stats, deleted, edited, media, links, emojis, emoticons]):
-                for _, v in dic.items():
-                    if isinstance(v, dict):
-                        counter[date][user][label].update(v)
-                    else: counter[date][user][label] += v
+            counter[date][user]["messages"] += stats[user]["messages"]
+            counter[date][user]["words"] += stats[user]["words"]
+            counter[date][user]["characters"] += stats[user]["characters"]
+            counter[date][user]["characters/word"] += stats[user]["characters/word"]
+            counter[date][user]["words/message"] += stats[user]["words/message"]
+            counter[date][user]["characters/message"] += stats[user]["characters/message"]
+            counter[date][user]["deleted"] += sum(get_messages_deleted_count({user: messages_}).values())
+            counter[date][user]["edited"] += sum(get_messages_edited_count({user: messages_}).values())
+            counter[date][user]["media"] += sum(get_media_sent_count({user: messages_}).values())
+            counter[date][user]["links"] += sum(get_links({user: messages_})[0].values())
+            emojis, emoticons, _ = get_emoji_emoticon_count({user: messages_})
+            counter[date][user]["emojis"] += sum(emojis.values())
+            counter[date][user]["emoticons"] += sum(emoticons.values())
+
+        if user in list not in dict:
 
     return counter
 

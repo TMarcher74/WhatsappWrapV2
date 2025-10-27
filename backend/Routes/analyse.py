@@ -134,7 +134,7 @@ async def get_detailed_date_freq(
         for user in parsed_data.get_users()
     }
 
-    return {"date_frequency": analyser.get_detailed_timeseries(parsed_data.get_date_by_user(), user_messages),}
+    return {"detailed_frequency": analyser.get_detailed_timeseries(parsed_data.get_date_by_user(), user_messages),}
 
 # Events
 @router.get("/events/{file_id}/milestones", tags=[Tags.Analyse_Events])
@@ -220,6 +220,7 @@ async def anlayse_all(file_id: str):
         "day_frequency": analyser.get_day_wise_freq(parsed_data.get_date_by_user()),
         "time_frequency": analyser.get_time_wise_freq(parsed_data.get_time_by_user()),
         "date_frequency": analyser.get_date_wise_freq(parsed_data.get_date_by_user()),
+        "detailed_frequency": analyser.get_detailed_timeseries(parsed_data.get_date_by_user(), user_messages),
         "user_wise_day_frequency": {user: analyser.get_day_wise_freq(parsed_data.get_date_by_user(user)) for user in parsed_data.get_users()},
         "user_wise_time_frequency": {user: analyser.get_time_wise_freq(parsed_data.get_time_by_user(user)) for user in parsed_data.get_users()},
         "milestones": analyser.get_milestones(
