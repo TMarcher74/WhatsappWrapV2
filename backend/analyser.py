@@ -76,6 +76,23 @@ def get_media_sent_count(user_messages: dict) -> dict[str:int]:
     media_message = "<Media omitted>"
     return get_messages_count(user_messages, media_message)
 
+def get_mentions_count(user_messages: dict, user: str) -> dict[str:int]:
+    """
+    Gets the count of mentions of a user
+    """
+    mention_message = "@⁨"+user
+    return get_messages_count(user_messages, mention_message)
+
+def get_user_wise_mentions_count(user_messages: dict, users: list[str]) -> dict[str:int]:
+    """
+    Gets the count of mentions for each user
+    """
+    mentions = {}
+    for user in users:
+        mentions[user] = get_mentions_count(user_messages, user)
+
+    return mentions
+
 def find_emoticons_dict(text):
     """
     Uses regex to identify text-based emoticons

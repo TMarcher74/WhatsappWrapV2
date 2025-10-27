@@ -72,6 +72,12 @@ async def get_links(file_id: str):
                                               url_count),
             "detailed_url_count": detailed_url_count}
 
+@router.get("/messages/{file_id}/mentions", tags=[Tags.Analyse_Messages])
+async def get_mentions(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"mentions": analyser.get_user_wise_mentions_count(user_messages, parsed_data.get_users())}
+
 @router.get("/messages/{file_id}/emojis-emoticons", tags=[Tags.Analyse_Messages])
 async def get_emojis_emoticons(file_id: str):
     parsed_data = verify_parsed_data(file_id)
@@ -215,6 +221,7 @@ async def anlayse_all(file_id: str):
         "media": analyser.get_media_sent_count(user_messages),
         "links": analyser.get_links(user_messages),
         "top_words": analyser.get_most_used_words(parsed_data.get_messages_by_user(), stop_words = True, top_n = 30, min_length = 2),
+        "mentions": analyser.get_user_wise_mentions_count(user_messages, parsed_data.get_users()),
         "emoji_count": analyser.get_emoji_emoticon_count(user_messages),
         "longest_streak": analyser.get_longest_streak(parsed_data.get_date_by_user()),
         "day_frequency": analyser.get_day_wise_freq(parsed_data.get_date_by_user()),
