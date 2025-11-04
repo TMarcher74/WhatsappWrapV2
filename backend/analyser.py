@@ -3,30 +3,135 @@ import re
 from datetime import timedelta, datetime, time
 from emoji import is_emoji
 import nltk
+from nltk import BigramAssocMeasures, TrigramAssocMeasures
+from nltk.collocations import BigramCollocationFinder, TrigramCollocationFinder
 from nltk.corpus import stopwords
 from collections import Counter, defaultdict
 import statistics
 from urllib.parse import urlparse
+
 from constants import DOMAIN_MAPS, SysMsgActions
 from math import sqrt
 
 nltk.download('stopwords')
-custom_stopwords = {'media','omitted','message','deleted','edited','https','com'}
+fixed_stopwords = {'media','omitted','message','deleted','edited','https','com'}
 
-def get_most_used_words(messages, stop_words: bool = True, top_n: int = 10, min_length: int = 2):
+def get_most_used_words(messages,
+                        custom_stopwords: set[str],
+                        max_freq: int,
+                        min_freq: int = 1,
+                        use_stop_words: bool = True,
+                        top_n: int = 10,
+                        min_length: int = 2,
+                        max_length: int = 30,):
     """
-    Gets the most frequently used words after filtering the stopwords if set to True
+    Gets the most frequently used words after being filtering
     """
+
     word_counter = Counter()
-    stop_words_set = (set(stopwords.words('english')) | custom_stopwords) if stop_words else custom_stopwords
+    if not custom_stopwords: custom_stopwords = set()
+    if use_stop_words: stop_words_set = (set(stopwords.words('english')) | fixed_stopwords | custom_stopwords)
+    else: stop_words_set = (fixed_stopwords | custom_stopwords)
 
     for msg in messages:
-        words = re.findall(r'\b\w+\b', msg.lower())
-        filtered_words = [word for word in words if word not in stop_words_set and len(word) > min_length]
-        word_counter.update(filtered_words)
-    return dict(word_counter.most_common(top_n))
+        if any(skip in msg for skip in [
+            "<Media omitted>", "<This message was edited>",
+            "This message was deleted", "You deleted this message",
+            "Waiting for this message"
+        ]):
+            continue
 
-def get_ratioed(total_messages: dict[str,int], count: dict[str,int]):
+        words = re.findall(r'\b\w+\b', msg.lower())
+        filtered_words = [word for word in words if word not in stop_words_set and max_length >= len(word) >= min_length]
+        word_counter.update(filtered_words)
+
+    if not max_freq: max_freq = word_counter.most_common(1)[0][1] # Setting max freq to max value
+
+    return Counter({k:v for k,v in word_counter.items() if min_freq <= v <= max_freq}).most_common(top_n)
+
+def get_collocations(messages, use_stop_words: bool = True, min_freq: int = 5, top_n: int = 15, avoid_fake_pairing: bool = False):
+    """
+    Forms pairs of consecutive words (bigrams, trigrams) and finds the most frequently occurring ones
+    """
+    stop_words = set()
+    list_of_words = []
+
+    if use_stop_words: stop_words = set(stopwords.words('english'))
+
+    for sentence in messages:
+        if any(skip in sentence for skip in [
+            "<Media omitted>", "<This message was edited>",
+            "This message was deleted", "You deleted this message",
+            "Waiting for this message"
+        ]):
+            continue
+
+        words = sentence.lower().split()
+
+        list_of_words.extend([w for w in words if w.isalpha() and (avoid_fake_pairing or w not in stop_words)])
+
+    bifinder = BigramCollocationFinder.from_words(list_of_words)
+    bifinder.apply_freq_filter(min_freq)
+
+    trifinder = TrigramCollocationFinder.from_words(list_of_words)
+    trifinder.apply_freq_filter(min_freq)
+
+    def filter_ngrams(ngram_score_pairs, stop_words, ngram_type):
+        if not avoid_fake_pairing:
+            return ngram_score_pairs
+
+        filtered = []
+        for ngram, score in ngram_score_pairs:
+            if ngram_type == 'bigram':
+                # reject if both words are stop words
+                if sum(tok in stop_words for tok in ngram) < 2:
+                    filtered.append((ngram, score))
+            else:
+                # reject if more than 1 stop word
+                if sum(tok in stop_words for tok in ngram) <= 1:
+                    filtered.append((ngram, score))
+        return filtered
+
+    bigram_measures = BigramAssocMeasures()
+    trigram_measures = TrigramAssocMeasures()
+
+    if avoid_fake_pairing:
+        bigram_freq = filter_ngrams(bifinder.ngram_fd.most_common(top_n * 3), stop_words, 'bigram')[:top_n]
+        trigram_freq = filter_ngrams(trifinder.ngram_fd.most_common(top_n * 3), stop_words, 'trigram')[:top_n]
+
+        bigram_pmi = filter_ngrams(bifinder.score_ngrams(bigram_measures.pmi), stop_words, 'bigram')[:top_n]
+        trigram_pmi = filter_ngrams(trifinder.score_ngrams(trigram_measures.pmi), stop_words, 'trigram')[:top_n]
+
+        bigram_lr = filter_ngrams(bifinder.score_ngrams(bigram_measures.likelihood_ratio), stop_words, 'bigram')[:top_n]
+        trigram_lr = filter_ngrams(trifinder.score_ngrams(trigram_measures.likelihood_ratio), stop_words, 'trigram')[
+                     :top_n]
+    else:
+        bigram_freq = bifinder.ngram_fd.most_common(top_n)
+        trigram_freq = trifinder.ngram_fd.most_common(top_n)
+
+        bigram_pmi = bifinder.score_ngrams(bigram_measures.pmi)[:top_n]
+        trigram_pmi = trifinder.score_ngrams(trigram_measures.pmi)[:top_n]
+        
+        bigram_lr = bifinder.score_ngrams(bigram_measures.likelihood_ratio)[:top_n]
+        trigram_lr = trifinder.score_ngrams(trigram_measures.likelihood_ratio)[:top_n]
+
+    result = {
+        "bigrams": {
+            "frequency": bigram_freq,
+            "pmi": bigram_pmi,
+            "likelihood_ratio": bigram_lr
+        },
+        "trigrams": {
+            "frequency": trigram_freq,
+            "pmi": trigram_pmi,
+            "likelihood_ratio": trigram_lr
+        }
+    }
+
+    return result
+
+
+def get_ratioed(total_messages: dict[str,int], count: dict):
     for user, total_message_count in total_messages.items():
         count[user] = [count.get(user), f"1 in {round(total_message_count/count.get(user)) if total_message_count*count.get(user) != 0 else 0}"]
 
@@ -379,7 +484,7 @@ def get_date_wise_freq(dates: list[datetime.date], top_n:int = None) -> dict[dat
     if top_n is None: return dict(date_counter)
     return dict(date_counter.most_common(top_n))
 
-def get_detailed_timeseries(dates: list[datetime.date], user_messages:dict) -> dict[datetime.date:list[int,int]]:
+def get_detailed_timeseries(user_messages: dict, users: list[str], dates: list[datetime.date]) -> dict[datetime.date:list[int,int]]:
     counter = defaultdict(lambda: defaultdict(lambda: {"messages": 0,
                                                        "words": 0,
                                                        "characters": 0,
@@ -392,6 +497,11 @@ def get_detailed_timeseries(dates: list[datetime.date], user_messages:dict) -> d
                                                        "links": 0,
                                                        "emojis": 0,
                                                        "emoticons": 0}))
+
+    # Initialising for all users
+    for date in dates:
+        for user in users:
+            _ = counter[date][user]
 
     for user, dict_ in user_messages.items():
         for date, messages_ in dict_.items():
@@ -410,8 +520,6 @@ def get_detailed_timeseries(dates: list[datetime.date], user_messages:dict) -> d
             emojis, emoticons, _ = get_emoji_emoticon_count({user: messages_})
             counter[date][user]["emojis"] += sum(emojis.values())
             counter[date][user]["emoticons"] += sum(emoticons.values())
-
-        if user in list not in dict:
 
     return counter
 

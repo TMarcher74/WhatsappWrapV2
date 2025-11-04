@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Form
 from constants import Tags, MAX_UPLOAD_FILE_SIZE, file_cache
 from fastapi.params import Query
 from parser import Parser
@@ -89,10 +89,52 @@ async def get_top_words(
         file_id: str,
         top_n: int = Query(30, ge = 1, le = 100, description = "Number of top words to return"),
         min_length: int = Query(2, ge = 1, description = "Minimum word length to include"),
-        stop_words: bool = Query(True, description = "Whether to exclude stopwords")
+        max_length: int = Query(30, description = "Maximum word length to include"),
+        min_frequency: int = Query(1, ge = 1, description= "Minimum frequency of the search"),
+        max_frequency: int = Query(None, description= "Maximum frequency of the search"),
+        user_wise: bool = Query(False, description= "Gives result with respect to each user"),
+        use_stop_words: bool = Query(True, description = "Whether to exclude stopwords"),
+        custom_stopwords: set[str] = Query(None, description="Set of words to exclude from the search")
 ):
     parsed_data = verify_parsed_data(file_id)
-    return {"top_words": analyser.get_most_used_words(parsed_data.get_messages_by_user(), stop_words, top_n, min_length),}
+    if user_wise: return {"top_words": {user:analyser.get_most_used_words(parsed_data.get_messages_by_user(user),
+                                                      custom_stopwords,
+                                                      max_frequency,
+                                                      min_frequency,
+                                                      use_stop_words,
+                                                      top_n,
+                                                      min_length,
+                                                      max_length)
+                                        for user in parsed_data.get_users()}}
+    return {"top_words": analyser.get_most_used_words(parsed_data.get_messages_by_user(),
+                                                      custom_stopwords,
+                                                      max_frequency,
+                                                      min_frequency,
+                                                      use_stop_words,
+                                                      top_n,
+                                                      min_length,
+                                                      max_length), }
+
+@router.get("/messages/{file_id}/collocations", tags=[Tags.Analyse_Messages])
+async def get_collocations(file_id: str,
+                           min_frequency: int = Query(1, ge = 1, description= "Minimum frequency of the search"),
+                           top_n: int = Query(30, ge = 1, le = 100, description = "Number of top words to return"),
+                           user_wise: bool = Query(False, description= "Gives result with respect to each user"),
+                           use_stop_words: bool = Query(True, description = "Whether to exclude stopwords"),
+                           avoid_fake_pairing: bool = Query(False, description = "Filter stop words after forming pairs")
+):
+    parsed_data = verify_parsed_data(file_id)
+    if user_wise: return {"collocations": {user: analyser.get_collocations(parsed_data.get_messages_by_user(user),
+                                                                           use_stop_words,
+                                                                           min_frequency,
+                                                                           top_n,
+                                                                           avoid_fake_pairing)
+                                           for user in parsed_data.get_users()}},
+    return {"collocations": analyser.get_collocations(parsed_data.get_messages_by_user(),
+                                                      use_stop_words,
+                                                      min_frequency,
+                                                      top_n,
+                                                      avoid_fake_pairing)}
 
 # Time
 @router.get("/time/{file_id}/streak", tags=[Tags.Analyse_Time])
@@ -140,7 +182,7 @@ async def get_detailed_date_freq(
         for user in parsed_data.get_users()
     }
 
-    return {"detailed_frequency": analyser.get_detailed_timeseries(parsed_data.get_date_by_user(), user_messages),}
+    return {"detailed_frequency": analyser.get_detailed_timeseries(user_messages, parsed_data.get_users(), parsed_data.get_date_by_user()),}
 
 # Events
 @router.get("/events/{file_id}/milestones", tags=[Tags.Analyse_Events])
@@ -227,7 +269,7 @@ async def anlayse_all(file_id: str):
         "day_frequency": analyser.get_day_wise_freq(parsed_data.get_date_by_user()),
         "time_frequency": analyser.get_time_wise_freq(parsed_data.get_time_by_user()),
         "date_frequency": analyser.get_date_wise_freq(parsed_data.get_date_by_user()),
-        "detailed_frequency": analyser.get_detailed_timeseries(parsed_data.get_date_by_user(), user_messages),
+        "detailed_frequency": analyser.get_detailed_timeseries(user_messages, parsed_data.get_users(), parsed_data.get_date_by_user()),
         "user_wise_day_frequency": {user: analyser.get_day_wise_freq(parsed_data.get_date_by_user(user)) for user in parsed_data.get_users()},
         "user_wise_time_frequency": {user: analyser.get_time_wise_freq(parsed_data.get_time_by_user(user)) for user in parsed_data.get_users()},
         "milestones": analyser.get_milestones(
