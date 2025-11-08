@@ -229,7 +229,7 @@ def find_emoticons_dict(text):
 
     return count, found_emoticons
 
-def get_emoji_emoticon_count(user_messages: dict) -> dict[str:list[int:dict[str:int]]]:
+def get_emoji_emoticon_count(user_messages: dict) -> tuple[dict[str,int], dict[str,int], dict[str,list[dict]]]:
     """
     Get the count of emojis sent by a user
     """
@@ -559,6 +559,7 @@ def normalise_reply_map(
         "raw": reply_map,
         "interaction_strength": dict(interaction_strength),
     }
+
 
 
 # All functions below are related to milestone function
