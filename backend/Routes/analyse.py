@@ -84,6 +84,12 @@ async def get_emojis_emoticons(file_id: str):
     user_messages = get_user_messages(parsed_data)
     return {"emoji_emoticon_count": analyser.get_emoji_emoticon_count(user_messages),}
 
+@router.get("/messages/{file_id}/punctuations", tags=[Tags.Analyse_Messages])
+async def get_punctuations(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"punctuations": analyser.get_punctuations(user_messages),}
+
 @router.get("/messages/{file_id}/top_words", tags=[Tags.Analyse_Messages])
 async def get_top_words(
         file_id: str,

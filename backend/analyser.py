@@ -295,6 +295,32 @@ def get_links(user_messages: dict):
 
     return url_count, detailed_url_count
 
+def get_punctuations(user_messages: dict):
+    """
+    Get count of all the punctuations used by a user
+    """
+    punct_count = {}
+    punctuation_pattern = re.compile(f"[{re.escape(string.punctuation)}]")
+    for user, messages in user_messages.items():
+        count = Counter({k:0 for k in string.punctuation})
+        total_chars = 0
+        for msg in messages:
+            total_chars += len(msg)
+            count.update(Counter(punctuation_pattern.findall(msg)))
+
+        user_stats = {}
+        for punct, c in count.most_common():
+            percentage = (c / total_chars * 100) if total_chars > 0 else 0.0
+            user_stats[punct] = {
+                "count": c,
+                "punct_count/character_count percentage": round(percentage, 3)
+            }
+
+        punct_count[user] = user_stats
+
+    return punct_count
+
+
 def get_word_char_stats(user_messages: dict):
     """
     Get number of words and characters sent by a user
