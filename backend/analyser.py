@@ -1,19 +1,20 @@
 import datetime
 import re
-from datetime import timedelta, datetime, time
+from datetime import timedelta, datetime, time, date
 from emoji import is_emoji
 import nltk
-from nltk import BigramAssocMeasures, TrigramAssocMeasures
+from nltk import BigramAssocMeasures, TrigramAssocMeasures, sent_tokenize
 from nltk.collocations import BigramCollocationFinder, TrigramCollocationFinder
 from nltk.corpus import stopwords
 from collections import Counter, defaultdict
 import statistics
 from urllib.parse import urlparse
-
+import string
 from constants import DOMAIN_MAPS, SysMsgActions
 from math import sqrt
 
 nltk.download('stopwords')
+nltk.download('punkt_tab')
 fixed_stopwords = {'media','omitted','message','deleted','edited','https','com'}
 
 def get_most_used_words(messages,
@@ -160,35 +161,35 @@ def get_messages_count(user_messages: dict, check_strings: str | list[str] = Non
 
     return message_count
 
-def get_messages_deleted_count(user_messages: dict) -> dict[str:int]:
+def get_messages_deleted_count(user_messages: dict) -> dict[str, int]:
     """
     Gets the count of deleted messages by each user
     """
     deleted_messages = ["This message was deleted", "You deleted this message"]
     return get_messages_count(user_messages, deleted_messages)
 
-def get_messages_edited_count(user_messages: dict) -> dict[str:int]:
+def get_messages_edited_count(user_messages: dict) -> dict[str, int]:
     """
     Gets the count of edited messages by each user
     """
     edited_messages = "<This message was edited>"
     return get_messages_count(user_messages, edited_messages)
 
-def get_media_sent_count(user_messages: dict) -> dict[str:int]:
+def get_media_sent_count(user_messages: dict) -> dict[str, int]:
     """
     Gets the count of media sent by each user
     """
     media_message = "<Media omitted>"
     return get_messages_count(user_messages, media_message)
 
-def get_mentions_count(user_messages: dict, user: str) -> dict[str:int]:
+def get_mentions_count(user_messages: dict, user: str) -> dict[str, int]:
     """
     Gets the count of mentions of a user
     """
     mention_message = "@⁨"+user
     return get_messages_count(user_messages, mention_message)
 
-def get_user_wise_mentions_count(user_messages: dict, users: list[str]) -> dict[str:int]:
+def get_user_wise_mentions_count(user_messages: dict, users: list[str]) -> dict[str, int]:
     """
     Gets the count of mentions for each user
     """
@@ -300,30 +301,48 @@ def get_word_char_stats(user_messages: dict):
     """
     wc_stats = {}
     for user, messages in user_messages.items():
-        m_count, w_count, c_count = 0,0,0
-        words, chars = [], []
+        m_count, w_count, c_count, s_count = 0,0,0,0
+        words, chars, sents = [], [], []
         for msg in messages:
+            s_count += len(sent_tokenize(msg))
             w_count += len(msg.split())
             c_count += len(msg)
             words.append(len(msg.split()))
             chars.append(len(msg))
-            m_count+=1
+            sents.append(len(sent_tokenize(msg)))
+            m_count += 1
+        s_median = statistics.median(sents)
+        s_mean = round(statistics.mean(sents), 3)
+        s_mode = statistics.mode(sents)
         w_median = statistics.median(words)
-        w_mean = int(statistics.mean(words))
+        w_mean = round(statistics.mean(words),3)
         w_mode = statistics.mode(words)
         c_median = statistics.median(chars)
-        c_mean = int(statistics.mean(chars))
+        c_mean = round(statistics.mean(chars), 3)
         c_mode = statistics.mode(chars)
         wc_stats[user] = {
             "messages": m_count,
+            "sentences": s_count,
             "words": w_count,
             "characters": c_count,
-            "characters/word": round(c_count/w_count,2) if w_count != 0 else 0,
-            "words/message": round(w_count/m_count,2) if m_count != 0 else 0,
-            "characters/message": round(c_count/m_count,2) if m_count != 0 else 0,
+
+            "sentences/message": round(s_count / m_count, 3) if m_count != 0 else 0,
+
+            "words/sentence": round(w_count/ s_count, 3) if s_count != 0 else 0,
+            "words/message": round(w_count / m_count, 3) if m_count != 0 else 0,
+
+            "characters/sentence": round(c_count / s_count, 3) if s_count != 0 else 0,
+            "characters/word": round(c_count/w_count, 3) if w_count != 0 else 0,
+            "characters/message": round(c_count/m_count, 3) if m_count != 0 else 0,
+
+            "sentence_median": s_median,
+            "sentence_mean": s_mean,
+            "sentence_mode": s_mode,
+
             "word_median": w_median,
-            "word_mean":w_mean,
+            "word_mean": w_mean,
             "word_mode": w_mode,
+
             "chars_median": c_median,
             "chars_mean": c_mean,
             "chars_mode": c_mode
@@ -436,7 +455,7 @@ def get_top_convos(
                    key=lambda x: x["messages_per_min"] * x["unique_participants_per_min"], reverse=True)[:top_n],
     }
 
-def get_longest_streak(dates: list[datetime.date]):
+def get_longest_streak(dates: list[date]):
     """
     Gets the longest streak in days
     """
@@ -461,7 +480,7 @@ def get_longest_streak(dates: list[datetime.date]):
         "Streak in days": streak
     }
 
-def get_day_wise_freq(dates: list[datetime.date]) -> dict[str:int]:
+def get_day_wise_freq(dates: list[date]) -> dict[str, int]:
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     day_counter = {"Monday":0, "Tuesday":0, "Wednesday":0, "Thursday":0, "Friday":0, "Saturday":0, "Sunday":0}
     for date in dates:
@@ -469,14 +488,14 @@ def get_day_wise_freq(dates: list[datetime.date]) -> dict[str:int]:
 
     return day_counter
 
-def get_time_wise_freq(times: list[datetime.time]) -> dict[datetime.time:int]:
+def get_time_wise_freq(times: list[time]) -> dict[time, int]:
     time_counter = Counter()
     for time in times:
         time_counter[time.hour] += 1
 
     return dict(time_counter)
 
-def get_date_wise_freq(dates: list[datetime.date], top_n:int = None) -> dict[datetime.date:int]:
+def get_date_wise_freq(dates: list[date], top_n:int = None) -> dict[date, int]:
     date_counter = Counter()
     for date in dates:
         date_counter[date] += 1
@@ -484,7 +503,7 @@ def get_date_wise_freq(dates: list[datetime.date], top_n:int = None) -> dict[dat
     if top_n is None: return dict(date_counter)
     return dict(date_counter.most_common(top_n))
 
-def get_detailed_timeseries(user_messages: dict, users: list[str], dates: list[datetime.date]) -> dict[datetime.date:list[int,int]]:
+def get_detailed_timeseries(user_messages: dict, users: list[str], dates: list[date]) -> dict[date,list[int]]:
     counter = defaultdict(lambda: defaultdict(lambda: {"messages": 0,
                                                        "words": 0,
                                                        "characters": 0,
@@ -507,17 +526,25 @@ def get_detailed_timeseries(user_messages: dict, users: list[str], dates: list[d
         for date, messages_ in dict_.items():
 
             stats = get_word_char_stats({user: messages_})
+            emojis, emoticons, _ = get_emoji_emoticon_count({user: messages_})
             counter[date][user]["messages"] += stats[user]["messages"]
+            counter[date][user]["sentences"] += stats[user]["sentences"]
             counter[date][user]["words"] += stats[user]["words"]
             counter[date][user]["characters"] += stats[user]["characters"]
-            counter[date][user]["characters/word"] += stats[user]["characters/word"]
+
+            counter[date][user]["sentences/message"] += stats[user]["sentences/message"]
+
+            counter[date][user]["words/sentence"] += stats[user]["words/sentence"]
             counter[date][user]["words/message"] += stats[user]["words/message"]
+
+            counter[date][user]["characters/sentence"] += stats[user]["characters/sentence"]
+            counter[date][user]["characters/word"] += stats[user]["characters/word"]
             counter[date][user]["characters/message"] += stats[user]["characters/message"]
+
             counter[date][user]["deleted"] += sum(get_messages_deleted_count({user: messages_}).values())
             counter[date][user]["edited"] += sum(get_messages_edited_count({user: messages_}).values())
             counter[date][user]["media"] += sum(get_media_sent_count({user: messages_}).values())
             counter[date][user]["links"] += sum(get_links({user: messages_})[0].values())
-            emojis, emoticons, _ = get_emoji_emoticon_count({user: messages_})
             counter[date][user]["emojis"] += sum(emojis.values())
             counter[date][user]["emoticons"] += sum(emoticons.values())
 
@@ -563,7 +590,7 @@ def normalise_reply_map(
 
 
 # All functions below are related to milestone function
-def _to_datetime(date: datetime.date, time: datetime.time = time(0,0,0)) -> datetime:
+def _to_datetime(date: date, time: time = time(0,0,0)) -> datetime:
     """
     Combines date and time
     """
@@ -615,7 +642,7 @@ def get_milestones(
         user_messages:list[dict],
         system_messages:list[dict],
         user_list: list[str],
-        dates: list[datetime.date],
+        dates: list[date],
         top_convos: dict,
         streak: dict,
         is_group: bool
