@@ -134,7 +134,7 @@ def get_collocations(messages, use_stop_words: bool = True, min_freq: int = 5, t
 
 def get_ratioed(total_messages: dict[str,int], count: dict):
     for user, total_message_count in total_messages.items():
-        count[user] = [count.get(user), f"1 in {round(total_message_count/count.get(user)) if total_message_count*count.get(user) != 0 else 0}"]
+        count[user] = [count.get(user), round(count.get(user)/total_message_count * 100, 3) if total_message_count*count.get(user) != 0 else 0]
 
     return count
 
@@ -259,17 +259,14 @@ def classify_url(raw_url: str) -> str:
     Maps URL to avoid repeated entries
     """
 
-    try:
-        parsed = urlparse(raw_url)
-        domain = parsed.netloc.lower()
-        if domain.startswith("www."):
-            domain = domain[4:]
-        for platform, domains in DOMAIN_MAPS.items():
-            if any(domain == d or domain.endswith("." + d) for d in domains):
-                return platform
-        return domain
-    except Exception:
-        return "other"
+    parsed = urlparse(raw_url)
+    domain = parsed.netloc.lower()
+    if domain.startswith("www."):
+        domain = domain[4:]
+    for platform, domains in DOMAIN_MAPS.items():
+        if any(domain == d or domain.endswith("." + d) for d in domains):
+            return platform
+    return domain
 
 def get_links(user_messages: dict):
     """
@@ -529,12 +526,16 @@ def get_date_wise_freq(dates: list[date], top_n:int = None) -> dict[date, int]:
     if top_n is None: return dict(date_counter)
     return dict(date_counter.most_common(top_n))
 
-def get_detailed_timeseries(user_messages: dict, users: list[str], dates: list[date]) -> dict[date,list[int]]:
+def get_detailed_timeseries(user_messages: dict, users: list[str], dates: list[date]):
     counter = defaultdict(lambda: defaultdict(lambda: {"messages": 0,
+                                                       "sentences": 0,
                                                        "words": 0,
                                                        "characters": 0,
-                                                       "characters/word": 0,
+                                                       "sentences/message": 0,
+                                                       "words/sentence": 0,
                                                        "words/message": 0,
+                                                       "characters/sentence": 0,
+                                                       "characters/word": 0,
                                                        "characters/message": 0,
                                                        "deleted": 0,
                                                        "edited": 0,

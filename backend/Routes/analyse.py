@@ -90,6 +90,12 @@ async def get_punctuations(file_id: str):
     user_messages = get_user_messages(parsed_data)
     return {"punctuations": analyser.get_punctuations(user_messages),}
 
+@router.get("/messages/{file_id}/profanity", tags=[Tags.Analyse_Messages])
+async def get_profanity(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    return {"profanity": analyser.get_profanity(user_messages),}
+
 @router.get("/messages/{file_id}/top_words", tags=[Tags.Analyse_Messages])
 async def get_top_words(
         file_id: str,
@@ -174,7 +180,7 @@ async def get_time_freq(
         user_wise: bool = Query(False, description= "Gives result with respect to each user")
 ):
     parsed_data = verify_parsed_data(file_id)
-    if user_wise: return {"date_frequency": {user: analyser.get_time_wise_freq(parsed_data.get_time_by_user(user))
+    if user_wise: return {"time_frequency": {user: analyser.get_time_wise_freq(parsed_data.get_time_by_user(user))
                                              for user in parsed_data.get_users()}},
     return {"time_frequency": analyser.get_time_wise_freq(parsed_data.get_time_by_user()),}
 
