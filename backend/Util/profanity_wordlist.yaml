@@ -1,0 +1,502 @@
+languages:
+  en:
+    ass:
+      forms:
+        - ass
+        - arrse
+        - arse
+        - asses
+
+    asshole:
+      forms:
+        - asshole
+        - arsehole
+        - asswhole
+
+    ass+something:
+      forms:
+        - assbang
+        - assbanged
+        - assfuck
+        - assfucker
+        - assfukka
+        - assmunch
+
+    something+ass:
+      forms:
+        - fatass
+
+    bastard:
+      forms:
+        - bastard
+
+    bellend:
+      forms:
+        - bellend
+
+    bimbo:
+      forms:
+        - bimbo
+        - bimbos
+
+    bitch:
+      forms:
+        - bitch
+        - bitches
+        - bitchin
+        - bitching
+        - l3itch
+
+    bullshit:
+      forms:
+        - bullshit
+        - bs
+        - bulshit
+        - bullshite
+
+    cock:
+      forms:
+        - cock
+        - cok
+        - kok
+        - kock
+
+    cock+something:
+      forms:
+        - cockface
+        - cockhead
+        - cockmunch
+        - cockmuncher
+        - cocksuck
+        - cocksucked
+        - cocksucker
+        - cocksucking
+        - cocksucks
+        - cokmuncher
+
+    coon:
+      forms:
+        - coon
+
+    crap:
+      forms:
+        - crap
+
+    cunt:
+      forms:
+        - cunt
+        - cnt
+        - cunts
+
+    cunt+something:
+      forms:
+        - cuntface
+        - cuntlicker
+        - cuntlicking
+
+    damn:
+      forms:
+        - damn
+        - daamn
+        - daamnn
+        - damnn
+        - damnit
+        - dam
+
+    something+damn:
+      forms:
+        - godamn
+        - godamnit
+        - goddam
+        - goddammit
+        - goddamn
+        - goddamned
+
+    dick:
+      forms:
+        - dick
+        - dik
+
+    dick+something:
+      forms:
+        - dickhead
+
+    something+dick:
+      forms:
+        - eatadick
+
+    dog+something:
+      forms:
+        - dog-fucker
+
+    douchebag:
+      forms:
+        - douchebag
+        - douchebags
+
+    dumbass:
+      forms:
+        - dumbass
+        - dumass
+        - dumbasses
+
+    fag:
+      forms:
+        - fag
+        - fagged
+        - faggot
+        - fagg
+        - fagging
+        - faggit
+        - faggitt
+        - faggot
+        - faggs
+        - fagot
+        - fagots
+
+    fanny:
+      forms:
+        - fanny
+        - fanyy
+
+    fanny+something:
+      forms:
+        - fannybandit
+        - fannyflaps
+        - fannyfucker
+
+    fuck:
+      forms:
+        - fuck
+        - fcuk
+        - fack
+        - fcuker
+        - fcuking
+        - feck
+        - fecker
+        - fk
+        - fook
+        - fooker
+        - frigg
+        - frigging
+        - fucka
+        - fucked
+        - fucker
+        - fuckers
+        - fuckin
+        - fucking
+        - fuckings
+        - fucks
+        - fuk
+        - fuker
+        - fukker
+        - fukkin
+        - fukking
+        - fuks
+        - fux
+        - fuxor
+        - fxck
+        - phuck
+        - phuk
+        - phuked
+        - phuking
+        - phukked
+        - phukking
+        - phuks
+        - phuq
+
+    fuck+something:
+      forms:
+        - fuckass
+        - fuckbitch
+        - fuckface
+        - fuckhead
+        - fuckheads
+        - fuckhole
+        - fuckingshitmotherfucker
+        - fuckme
+        - fucknugget
+        - fucknut
+        - fuckoff
+        - fuckpuppet
+        - fucktard
+        - fucktoy
+        - fucktrophy
+        - fuckup
+        - fuckwad
+        - fuckwhit
+        - fuckwit
+        - fuckyomama
+        - fudgepacker
+        - fukwhit
+        - fukwit
+
+    something+fuck:
+      forms:
+        - m-fucking
+        - mafugly
+        - mothafuck
+        - mothafucka
+        - mothafuckas
+        - mothafuckaz
+        - mothafucked
+        - mothafucker
+        - mothafuckers
+        - mothafuckin
+        - mothafucking
+        - mothafuckings
+        - mothafucks
+        - motherfuck
+        - motherfucka
+        - motherfucked
+        - motherfucker
+        - motherfuckers
+        - motherfuckin
+        - motherfucking
+        - motherfuckings
+        - motherfuckka
+        - motherfucks
+        - mtherfucker
+        - mthrfucker
+        - mthrfucking
+        - muthafecker
+        - muthafuckaz
+        - muthafucker
+        - muthafuckker
+        - mutherfucker
+        - mutherfucking
+        - muthrfucking
+        - penisfucker
+        - pigfucker
+
+    floozy:
+      forms:
+        - floozy
+
+    hamflap:
+      forms:
+        - hamflap
+
+    jack+something:
+      forms:
+        - jackass
+        - jackhole
+        - jackoff
+
+    jerk:
+      forms:
+        - jerk
+        - jerked
+        - jerkoff
+
+    knob+something:
+      forms:
+        - knobead
+        - knobed
+        - knobend
+        - knobhead
+        - knobjocky
+        - knobjokey
+        - nobhead
+        - nobjocky
+        - nobjokey
+
+    moron:
+      forms:
+        - moron
+
+    nigga:
+      forms:
+        - nigga
+        - nig
+        - nigg
+        - niggah
+        - niggas
+        - niggaz
+        - nigger
+        - niggers
+        - niggle
+        - niglet
+
+    nimrod:
+      forms:
+        - nimrod
+
+    numbnuts:
+      forms:
+        - numbnuts
+
+    pillowbiter:
+      forms:
+        - pillowbiter
+
+    pissflaps:
+      forms:
+        - pissflaps
+
+    pussy:
+      forms:
+        - pusse
+        - pussi
+        - pussies
+        - pussy
+        - pussys
+
+    pussy+something:
+      forms:
+        - pussyfart
+        - pussypalace
+        - pussypounder
+
+    retard:
+      forms:
+        - reetard
+        - retard
+        - retarded
+        - ritard
+        - rtard
+
+    sausagequeen:
+      forms:
+        - sausagequeen
+
+    scag:
+      forms:
+        - scag
+        - skag
+
+    schlong:
+      forms:
+        - schlong
+
+    shag:
+      forms:
+        - shag
+        - shagger
+        - shaggin
+        - shagging
+
+    shit:
+      forms:
+        - shit
+        - shite
+        - shited
+        - shitey
+        - shiting
+        - shitings
+        - shits
+        - shitt
+        - shitted
+        - shitter
+        - shitters
+        - shitting
+        - shittings
+        - shitty
+
+    shit+something:
+      forms:
+        - shitdick
+        - shiteater
+        - shitface
+        - shitfuck
+        - shitfucker
+        - shitfull
+        - shithead
+        - shithole
+        - shithouse
+
+    shiz:
+      forms:
+        - shiz
+
+    slut:
+      forms:
+        - slut
+        - sluts
+
+    slut+something:
+      forms:
+        - slutbucket
+        - slutdumper
+        - slutkiss
+
+    son-of-a-bitch:
+      forms:
+        - son-of-a-bitch
+        - sumofabiatch
+
+    teabagging:
+      forms:
+        - teabagging
+        - teabag
+
+    tit:
+      forms:
+        - teat
+        - teets
+        - tit
+        - titi
+        - tits
+        - titt
+        - titties
+        - titty
+
+    tit+something:
+      forms:
+        - titfuck
+        - tittiefucker
+        - tittyfuck
+        - tittyfucker
+        - tittywank
+        - titwank
+
+    tush:
+      forms:
+        - tush
+
+    twat:
+      forms:
+        - twat
+        - twathead
+        - twats
+        - twatty
+        - twunt
+        - twunter
+
+    wang:
+      forms:
+        - wang
+
+    wank:
+      forms:
+        - wank
+        - wanker
+
+    wench:
+      forms:
+        - wench
+
+    whore:
+      forms:
+        - whore
+        - whoar
+        - hore
+        - whored
+        - whores
+        - whoring
+
+    whore+something:
+      forms:
+        - whoralicious
+        - whorealicious
+        - whoreface
+        - whorehopper
+        - whorehouse
+
+    acronyms:
+      forms:
+        - gtfo
+        - wtf
+        - mofo
+        - stfu
+        - mf
