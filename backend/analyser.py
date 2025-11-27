@@ -12,6 +12,10 @@ from urllib.parse import urlparse
 import string
 from constants import DOMAIN_MAPS, SysMsgActions
 from math import sqrt
+import yaml
+
+TOKEN_RE = re.compile(r"\b\w+(?:'\w+)?\b")
+RE_REPS = re.compile(r"(.)\1+")         # (keep only 2 of same char)
 
 nltk.download('stopwords')
 nltk.download('punkt_tab')
@@ -317,6 +321,130 @@ def get_punctuations(user_messages: dict):
 
     return punct_count
 
+def get_profanity(user_messages: dict):
+    """
+    Get count of all the punctuations used by a user
+    """
+    LEET_MAP = {
+        'a': {'4', '@'},
+        'e': {'3'},
+        'i': {'1', '!'},
+        'o': {'0'},
+        's': {'5', '$'},
+        't': {'7'}
+    }
+    WILDCARDS = {"*", "@", "#", "_", "$"}
+
+
+    with open("./Util/profanity_wordlist.yaml", "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+
+    languages = data.get("languages", {})
+    FORM_MAP = {}
+    CANONICAL_META = {}
+
+    for lang, words in languages.items():
+        for canonical, attrs in words.items():
+            forms = set(attrs.get("forms", []))
+
+            # always include canonical itself
+            if canonical not in forms:
+                forms.add(canonical)
+
+            CANONICAL_META[canonical] = {
+                "forms": forms,
+                # "category": attrs.get("category"),
+                # "severity": attrs.get("severity"),
+                "language": lang
+            }
+            for form in forms:
+                FORM_MAP[form] = canonical
+
+    profanity_set = set(FORM_MAP.keys())
+    profanity_bucket = defaultdict(set)
+    for p in profanity_set:
+        profanity_bucket[len(p)].add(p)
+
+    def profanity_normalise(word: str):
+        chars = set(word)
+        w = word
+        for char, replacements in LEET_MAP.items():
+            if chars and replacements:
+                for replacement in replacements:
+                    w = w.replace(replacement, char)
+                chars = set(w)
+
+        return w
+
+    def remove_repetitions(word):
+        return RE_REPS.sub(r'\1\1', word)
+
+    def word_matches_profanity(word):
+        if len(word) < 2: return None
+        word = remove_repetitions(word)
+
+        # Direct match
+        if word in profanity_set: return word
+
+        # Normalised match
+        normalised_word = profanity_normalise(word)
+        if normalised_word in profanity_set: return normalised_word
+
+        first, last = word[0], word[-1]
+        if profanity_bucket.get(len(word)):
+            for p_word in profanity_bucket[len(word)]:
+                if not (first == p_word[0] or last == p_word[-1] or word[0] in WILDCARDS):
+                    continue
+                matches = True
+                for w_char, p_char in zip(word, p_word):
+                    if w_char in WILDCARDS or w_char == p_char:
+                        continue
+
+                    matches = False
+                    break
+                if matches: return p_word
+        return None
+
+    results = {}
+    for user, messages in user_messages.items():
+
+        text = " ".join(m.lower() for m in (messages or []))
+        tokens = TOKEN_RE.findall(text)
+        total_words = len(text.split())
+
+        form_counter = Counter()
+        canonical_counter = Counter()
+
+        for tok in tokens:
+            matched_form = word_matches_profanity(tok)
+            if not matched_form:
+                continue
+            canonical = FORM_MAP.get(matched_form, matched_form)
+            form_counter[matched_form] += 1
+            canonical_counter[canonical] += 1
+
+        results[user] = {
+            "total_p_words": sum(canonical_counter.values()),
+            "total_percentage": round(sum(canonical_counter.values()) / total_words * 100, 3),
+
+            "forms": {
+                form: {
+                    "count": c,
+                    "percentage": round((c / total_words) * 100, 3)
+                }
+                for form, c in form_counter.most_common()
+            },
+
+            "canonical": {
+                canonical: {
+                    "count": c,
+                    "percentage": round((c / total_words) * 100, 3)
+                }
+                for canonical, c in canonical_counter.most_common()
+            }
+        }
+
+    return results
 
 def get_word_char_stats(user_messages: dict):
     """
