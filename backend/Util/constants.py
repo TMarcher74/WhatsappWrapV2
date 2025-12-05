@@ -1,39 +1,11 @@
-from enum import Enum
 from cachetools import TTLCache
+from backend.Util.enums import SysMsgActions
 
 # Chat data is temp stored in cache and cleared after 10 min
-file_cache = TTLCache(maxsize=100, ttl=600)
+file_cache = TTLCache(maxsize=100, ttl=6000)
 
 # Whatsapp max export size currently is 18MB
 MAX_UPLOAD_FILE_SIZE = 18874368
-
-# Tags for different routes and paths
-class Tags(Enum):
-    Status = "Status"
-    Upload = "Upload"
-    Analyse_Users = "Analyse Users"
-    Analyse_Messages = "Analyse Messages"
-    Analyse_Time = "Analyse Time"
-    Analyse_Events = "Analyse Events"
-
-# List of usable Gemini models
-class GeminiModels(str, Enum):
-    G25Pro = "gemini-2.5-pro"
-    G25Flash = "gemini-2.5-flash"
-    G25FlashLite = "gemini-2.5-flash-lite"
-    G20Flash = "gemini-2.0-flash"
-    G20FlashLite = "gemini-2.0-flash-lite"
-
-class SysMsgActions(str, Enum):
-    CreateGroup = "created group"
-    AddUser = "added"
-    ChangeGrpDesc = "changed the group description"
-    ChangeGrpIcon = "changed this group's icon"
-    RemoveGrpIcon = "deleted this group's icon"
-    ChangeGrpName = "changed the group name from"
-    PinMsg = "pinned a message"
-    AddAdmin = "now an admin"
-    RemoveAdmin = "no longer an admin"
 
 ACTIONS = {
     SysMsgActions.CreateGroup: lambda parts: {

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, status, Form
-from constants import Tags, MAX_UPLOAD_FILE_SIZE, file_cache
+from backend.Util.constants import file_cache
+from backend.Util.enums import Tags
 from fastapi.params import Query
-from parser import Parser
-import analyser
+from backend.Text_Processing.parser import Parser
+from backend.Text_Processing import analyser
 
 router = APIRouter(prefix="/analyse")
 

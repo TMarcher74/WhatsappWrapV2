@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 import statistics
 from urllib.parse import urlparse
 import string
-from constants import DOMAIN_MAPS, SysMsgActions
+from backend.Util.constants import DOMAIN_MAPS, SysMsgActions
 from math import sqrt
 import yaml
 
@@ -336,7 +336,7 @@ def get_profanity(user_messages: dict):
     WILDCARDS = {"*", "@", "#", "_", "$"}
 
 
-    with open("./Util/profanity_wordlist.yaml", "r", encoding="utf-8") as file:
+    with open("../Wordlist/profanity_wordlist.yaml", "r", encoding="utf-8") as file:
         data = yaml.safe_load(file)
 
     languages = data.get("languages", {})
@@ -445,6 +445,11 @@ def get_profanity(user_messages: dict):
         }
 
     return results
+
+def get_birthdays(user_messages: dict):
+    for user, messages in user_messages.items():
+        for msg in messages:
+            pass
 
 def get_word_char_stats(user_messages: dict):
     """

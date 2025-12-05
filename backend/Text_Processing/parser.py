@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import datetime
 import re
-from constants import ACTIONS
+from backend.Util.constants import ACTIONS
 
 class Parser:
     def __init__(self, chat_text: str):

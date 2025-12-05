@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
-from constants import Tags, MAX_UPLOAD_FILE_SIZE, file_cache
-from parser import Parser
+from backend.Util.constants import file_cache, MAX_UPLOAD_FILE_SIZE
+from backend.Util.enums import Tags
+from backend.Text_Processing.parser import Parser
 import  uuid
 
 
