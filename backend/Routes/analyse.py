@@ -325,32 +325,57 @@ async def anlayse_all(file_id: str):
         for user in parsed_data.get_users()
     }
 
+    links, detailed_links = analyser.get_links(user_messages)
+    emoji_counter, emoticon_counter, emojis_emoticons_used = analyser.get_emoji_emoticon_count(user_messages)
+
     # Run analysis
     analysis = {
         "users": parsed_data.get_users(),
         "total_messages": analyser.get_messages_count(user_messages),
         "word_character_stats": analyser.get_word_char_stats(user_messages),
-        # "sum_of_total_messages":len(parser.get_messages()),
         "deleted_messages": analyser.get_messages_deleted_count(user_messages),
         "edited_messages": analyser.get_messages_edited_count(user_messages),
         "media": analyser.get_media_sent_count(user_messages),
-        "links": analyser.get_links(user_messages),
-        "top_words": analyser.get_most_used_words(parsed_data.get_messages_by_user(), stop_words = True, top_n = 30, min_length = 2),
-        "mentions": analyser.get_user_wise_mentions_count(user_messages, parsed_data.get_users()),
-        "emoji_count": analyser.get_emoji_emoticon_count(user_messages),
+        "links": links,
+        "detailed_links": detailed_links,
+        "emoji_count": emoji_counter,
+        "emoticon_counter": emoticon_counter,
+        "emojis_emoticons_used": emojis_emoticons_used,
         "longest_streak": analyser.get_longest_streak(parsed_data.get_date_by_user()),
         "day_frequency": analyser.get_day_wise_freq(parsed_data.get_date_by_user()),
         "time_frequency": analyser.get_time_wise_freq(parsed_data.get_time_by_user()),
         "date_frequency": analyser.get_date_wise_freq(parsed_data.get_date_by_user()),
-        "detailed_frequency": analyser.get_detailed_timeseries(user_messages, parsed_data.get_users(), parsed_data.get_date_by_user()),
-        "user_wise_day_frequency": {user: analyser.get_day_wise_freq(parsed_data.get_date_by_user(user)) for user in parsed_data.get_users()},
-        "user_wise_time_frequency": {user: analyser.get_time_wise_freq(parsed_data.get_time_by_user(user)) for user in parsed_data.get_users()},
+        "user_wise_day_frequency": {user: analyser.get_day_wise_freq(parsed_data.get_date_by_user(user)) for user in
+                                    parsed_data.get_users()},
+        "user_wise_time_frequency": {user: analyser.get_time_wise_freq(parsed_data.get_time_by_user(user)) for user in
+                                     parsed_data.get_users()},
+        "top_words": analyser.get_most_used_words(
+            parsed_data.get_messages_by_user(),
+            custom_stopwords=set(),
+            min_freq=1,
+            use_stop_words=True,
+            top_n=30,
+            min_length=2,
+            max_length=30
+        ),
+        "mentions": analyser.get_user_wise_mentions_count(user_messages, parsed_data.get_users()),
+        "profanity": analyser.get_profanity(user_messages),
+        "detailed_frequency": analyser.get_detailed_timeseries(
+            {
+                user: parsed_data.get_date_and_messages_by_user(user)
+                for user in parsed_data.get_users()
+            },
+            parsed_data.get_users(),
+            parsed_data.get_date_by_user()),
         "milestones": analyser.get_milestones(
             parsed_data.user_messages,
             parsed_data.system_messages,
             parsed_data.get_users(),
             parsed_data.get_date_by_user(),
-            analyser.get_top_convos(parsed_data.get_date_time_by_user(),parsed_data.get_messages_by_user(),parsed_data.get_users_wrt_messages(),
+            analyser.get_top_convos(
+                parsed_data.get_date_time_by_user(),
+                parsed_data.get_messages_by_user(),
+                parsed_data.get_users_wrt_messages(),
                 min_convo_time=5,
                 min_convo_length=20,
                 top_n=5
