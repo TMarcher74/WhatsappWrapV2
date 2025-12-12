@@ -1,5 +1,6 @@
 import datetime
 import re
+import sys
 from datetime import timedelta, datetime, time, date
 from emoji import is_emoji
 import nltk
@@ -23,7 +24,7 @@ fixed_stopwords = {'media','omitted','message','deleted','edited','https','com'}
 
 def get_most_used_words(messages,
                         custom_stopwords: set[str],
-                        max_freq: int,
+                        max_freq: int = sys.maxsize,
                         min_freq: int = 1,
                         use_stop_words: bool = True,
                         top_n: int = 10,
@@ -196,10 +197,20 @@ def get_mentions_count(user_messages: dict, user: str) -> dict[str, int]:
 def get_user_wise_mentions_count(user_messages: dict, users: list[str]) -> dict[str, int]:
     """
     Gets the count of mentions for each user
+    Format:
+        {
+            User A mentioned by:
+            {
+                User A: 0
+                User B: 5
+                User C: 4
+                User D: 1
+            }
+        }
     """
     mentions = {}
     for user in users:
-        mentions[user] = get_mentions_count(user_messages, user)
+        mentions[user+" mentioned by"] = get_mentions_count(user_messages, user)
 
     return mentions
 
@@ -335,8 +346,7 @@ def get_profanity(user_messages: dict):
     }
     WILDCARDS = {"*", "@", "#", "_", "$"}
 
-
-    with open("../Wordlist/profanity_wordlist.yaml", "r", encoding="utf-8") as file:
+    with open("Wordlist/profanity_wordlist.yaml", "r", encoding="utf-8") as file:
         data = yaml.safe_load(file)
 
     languages = data.get("languages", {})
@@ -451,60 +461,131 @@ def get_birthdays(user_messages: dict):
         for msg in messages:
             pass
 
-def get_word_char_stats(user_messages: dict):
+def get_message_stats(user_messages: dict, user_wise: bool = True):
     """
     Get number of words and characters sent by a user
     """
-    wc_stats = {}
-    for user, messages in user_messages.items():
-        m_count, w_count, c_count, s_count = 0,0,0,0
-        words, chars, sents = [], [], []
-        for msg in messages:
-            s_count += len(sent_tokenize(msg))
-            w_count += len(msg.split())
-            c_count += len(msg)
-            words.append(len(msg.split()))
-            chars.append(len(msg))
-            sents.append(len(sent_tokenize(msg)))
-            m_count += 1
-        s_median = statistics.median(sents)
-        s_mean = round(statistics.mean(sents), 3)
-        s_mode = statistics.mode(sents)
-        w_median = statistics.median(words)
-        w_mean = round(statistics.mean(words),3)
-        w_mode = statistics.mode(words)
-        c_median = statistics.median(chars)
-        c_mean = round(statistics.mean(chars), 3)
-        c_mode = statistics.mode(chars)
-        wc_stats[user] = {
-            "messages": m_count,
-            "sentences": s_count,
-            "words": w_count,
-            "characters": c_count,
 
-            "sentences/message": round(s_count / m_count, 3) if m_count != 0 else 0,
-
-            "words/sentence": round(w_count/ s_count, 3) if s_count != 0 else 0,
-            "words/message": round(w_count / m_count, 3) if m_count != 0 else 0,
-
-            "characters/sentence": round(c_count / s_count, 3) if s_count != 0 else 0,
-            "characters/word": round(c_count/w_count, 3) if w_count != 0 else 0,
-            "characters/message": round(c_count/m_count, 3) if m_count != 0 else 0,
-
-            "sentence_median": s_median,
-            "sentence_mean": s_mean,
-            "sentence_mode": s_mode,
-
-            "word_median": w_median,
-            "word_mean": w_mean,
-            "word_mode": w_mode,
-
-            "chars_median": c_median,
-            "chars_mean": c_mean,
-            "chars_mode": c_mode
+    def _safe_stats(values: list[int]):
+        if not values:
+            return {"median": 0, "mean": 0.0, "mode": None}
+        try:
+            mode = statistics.mode(values)
+        except statistics.StatisticsError:
+            mode = None
+        return {
+            "median": statistics.median(values),
+            "mean": round(statistics.mean(values), 3),
+            "mode": mode,
         }
 
-    return wc_stats
+    msg_stats = {}
+    global_msgs = 0
+    global_words = 0
+    global_chars = 0
+    global_sents = 0
+    perm_words, perm_chars, perm_sents = [], [], []
+
+    for user, messages in user_messages.items():
+        m_count = len(messages)
+        words_per_msg = []
+        chars_per_msg = []
+        sents_per_msg = []
+
+        # local references for speed
+        append_w = words_per_msg.append
+        append_c = chars_per_msg.append
+        append_s = sents_per_msg.append
+        g_append_w = perm_words.append
+        g_append_c = perm_chars.append
+        g_append_s = perm_sents.append
+        for msg in messages:
+            sents = len(sent_tokenize(msg))
+            words = len(msg.split())
+            chars = len(msg)
+
+            append_s(sents)
+            append_w(words)
+            append_c(chars)
+
+            g_append_s(sents)
+            g_append_w(words)
+            g_append_c(chars)
+
+        total_sents = sum(sents_per_msg)
+        total_words = sum(words_per_msg)
+        total_chars = sum(chars_per_msg)
+
+        global_msgs += m_count
+        global_sents += total_sents
+        global_words += total_words
+        global_chars += total_chars
+
+        s_stats = _safe_stats(sents_per_msg)
+        w_stats = _safe_stats(words_per_msg)
+        c_stats = _safe_stats(chars_per_msg)
+
+        msg_stats[user] = {
+            "messages": m_count,
+            "sentences": total_sents,
+            "words": total_words,
+            "characters": total_chars,
+
+            "sentences/message": round(total_sents / m_count, 3) if m_count != 0 else 0,
+
+            "words/sentence": round(total_words/ total_sents, 3) if total_sents != 0 else 0,
+            "words/message": round(total_words / m_count, 3) if m_count != 0 else 0,
+
+            "characters/sentence": round(total_chars / total_sents, 3) if total_sents != 0 else 0,
+            "characters/word": round(total_chars/total_words, 3) if total_words != 0 else 0,
+            "characters/message": round(total_chars/m_count, 3) if m_count != 0 else 0,
+
+            "sentence_median": s_stats["median"],
+            "sentence_mean": s_stats["mean"],
+            "sentence_mode": s_stats["mode"],
+
+            "word_median": w_stats["median"],
+            "word_mean": w_stats["mean"],
+            "word_mode": w_stats["mode"],
+
+            "chars_median": c_stats["median"],
+            "chars_mean": c_stats["mean"],
+            "chars_mode": c_stats["mode"],
+        }
+
+    if user_wise: return msg_stats
+    s_stats = _safe_stats(perm_sents)
+    w_stats = _safe_stats(perm_words)
+    c_stats = _safe_stats(perm_chars)
+
+    return {
+        "messages": global_msgs,
+        "sentences": global_sents,
+        "words": global_words,
+        "characters": global_chars,
+
+        "sentences/message": round(global_sents / global_msgs, 3) if global_msgs else 0,
+
+        "words/sentence": round(global_words / global_sents, 3) if global_sents else 0,
+        "words/message": round(global_words / global_msgs, 3) if global_msgs else 0,
+
+        "characters/sentence": round(global_chars / global_sents, 3) if global_sents else 0,
+        "characters/word": round(global_chars / global_words, 3) if global_words else 0,
+        "characters/message": round(global_chars / global_msgs, 3) if global_msgs else 0,
+
+        "sentence_median": s_stats["median"],
+        "sentence_mean": s_stats["mean"],
+        "sentence_mode": s_stats["mode"],
+
+        "word_median": w_stats["median"],
+        "word_mean": w_stats["mean"],
+        "word_mode": w_stats["mode"],
+
+        "chars_median": c_stats["median"],
+        "chars_mean": c_stats["mean"],
+        "chars_mode": c_stats["mode"],
+    }
+
 
 def get_top_convos(
         date_times: list[datetime],
@@ -685,7 +766,7 @@ def get_detailed_timeseries(user_messages: dict, users: list[str], dates: list[d
     for user, dict_ in user_messages.items():
         for date, messages_ in dict_.items():
 
-            stats = get_word_char_stats({user: messages_})
+            stats = get_message_stats({user: messages_})
             emojis, emoticons, _ = get_emoji_emoticon_count({user: messages_})
             counter[date][user]["messages"] += stats[user]["messages"]
             counter[date][user]["sentences"] += stats[user]["sentences"]

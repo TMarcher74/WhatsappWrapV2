@@ -1,9 +1,11 @@
+import itertools
 from fastapi import APIRouter, HTTPException, status, Form
 from backend.Util.constants import file_cache
 from backend.Util.enums import Tags
 from fastapi.params import Query
 from backend.Text_Processing.parser import Parser
 from backend.Text_Processing import analyser
+from collections import defaultdict, Counter
 
 router = APIRouter(prefix="/analyse")
 
@@ -32,46 +34,80 @@ async def get_users(file_id: str):
 
 # Messages
 @router.get("/messages/{file_id}/total", tags=[Tags.Analyse_Messages])
-async def get_total_messages(file_id: str):
+async def get_total_messages(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"total_messages": analyser.get_messages_count(user_messages),}
+    if user_wise: return {"total_messages": analyser.get_messages_count(user_messages),}
+    return {"total_messages": sum([val for val in analyser.get_messages_count(user_messages).values()])}
 
 @router.get("/messages/{file_id}/stats", tags=[Tags.Analyse_Messages])
-async def get_message_stats(file_id: str):
+async def get_message_stats(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"word_char_stats": analyser.get_word_char_stats(user_messages),}
+    return {"message_stats": analyser.get_message_stats(user_messages, user_wise),}
 
 @router.get("/messages/{file_id}/deleted", tags=[Tags.Analyse_Messages])
-async def get_deleted_messages(file_id: str):
+async def get_deleted_messages(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"deleted_messages": analyser.get_ratioed(analyser.get_messages_count(user_messages),
-                                                     analyser.get_messages_deleted_count(user_messages)),}
+    if user_wise: return {"deleted_messages": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                                                   analyser.get_messages_deleted_count(user_messages)),}
+    return {"deleted_messages": sum([val for val in analyser.get_messages_deleted_count(user_messages).values()])}
 
 @router.get("/messages/{file_id}/edited", tags=[Tags.Analyse_Messages])
-async def get_edited_messages(file_id: str):
+async def get_edited_messages(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"edited_messages": analyser.get_ratioed(analyser.get_messages_count(user_messages),
-                                                    analyser.get_messages_edited_count(user_messages)),}
+    if user_wise: return {"edited_messages": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                                                  analyser.get_messages_edited_count(user_messages)),}
+    return {"edited_messages": sum([val for val in analyser.get_messages_edited_count(user_messages).values()])}
 
 @router.get("/messages/{file_id}/media", tags=[Tags.Analyse_Messages])
-async def get_media(file_id: str):
+async def get_media(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"media": analyser.get_ratioed(analyser.get_messages_count(user_messages),
-                                          analyser.get_media_sent_count(user_messages)),}
+    if user_wise: return {"media": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                                        analyser.get_media_sent_count(user_messages)),}
+    return {"media": sum([val for val in analyser.get_media_sent_count(user_messages).values()])}
+
 
 @router.get("/messages/{file_id}/links", tags=[Tags.Analyse_Messages])
-async def get_links(file_id: str):
+async def get_links(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
     url_count, detailed_url_count = analyser.get_links(user_messages)
-    return {"url_count": analyser.get_ratioed(analyser.get_messages_count(user_messages),
-                                              url_count),
-            "detailed_url_count": detailed_url_count}
+    if user_wise: return {"url_count": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                                            url_count),
+                          "detailed_url_count": detailed_url_count}
+
+    list_of_dicts = [lis[0] for lis in detailed_url_count.values()]
+    res = defaultdict(int)
+    for d in list_of_dicts:
+        for k, v in d.items():
+            res[k] += v
+    return {
+        "url_count": sum([val for val in url_count.values()]),
+        "detailed_url_count": [dict(sorted(res.items(), key=lambda x:x[1], reverse=True)),
+                               list(itertools.chain.from_iterable(lis[1] for lis in detailed_url_count.values()))]
+    }
 
 @router.get("/messages/{file_id}/mentions", tags=[Tags.Analyse_Messages])
 async def get_mentions(file_id: str):
@@ -80,10 +116,34 @@ async def get_mentions(file_id: str):
     return {"mentions": analyser.get_user_wise_mentions_count(user_messages, parsed_data.get_users())}
 
 @router.get("/messages/{file_id}/emojis-emoticons", tags=[Tags.Analyse_Messages])
-async def get_emojis_emoticons(file_id: str):
+async def get_emojis_emoticons(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"emoji_emoticon_count": analyser.get_emoji_emoticon_count(user_messages),}
+    emoji_counter, emoticon_counter, emojis_emoticons_used = analyser.get_emoji_emoticon_count(user_messages)
+    if user_wise: return {
+        "emoji_count": emoji_counter,
+        "emoticon_count": emoticon_counter,
+        "emojis_emoticons_used": emojis_emoticons_used
+    }
+
+    def combine_pairs_sum(pairs):
+        a = Counter()
+        b = Counter()
+        for x, y in pairs:
+            a.update(x)
+            b.update(y)
+        return dict(a.most_common()), dict(b.most_common())
+    pairs = list(vals for vals in emojis_emoticons_used.values())
+
+    return {
+        "emoji_count": sum([val for val in emoji_counter.values()]),
+        "emoticon_count": sum([val for val in emoticon_counter.values()]),
+        "emojis_emoticons_used": combine_pairs_sum(pairs)
+    }
+
 
 @router.get("/messages/{file_id}/punctuations", tags=[Tags.Analyse_Messages])
 async def get_punctuations(file_id: str):
