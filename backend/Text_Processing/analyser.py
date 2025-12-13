@@ -957,11 +957,16 @@ def get_milestones(
                             f"From today for the next {streak["Streak in days"]} days, at least a single message is exchanged!"))
     chat_milestones.append((_to_datetime(streak["Streak end"]), f"The {streak["Streak in days"]} day streak ended today."))
 
-    for _ in grp_milestones:
-        chat_milestones.append(_)
+    # Last message
+    _ = get_nth_message(user_messages, len(user_messages)-1)
+    chat_milestones.append(
+        (_to_datetime(_["date"], _["time"]), f"The last message was sent by {_["sender"]} : {_["message"]}"))
 
-    chat_milestones = sorted(chat_milestones, key = lambda x: x[0])
+    for _ in chat_milestones:
+        grp_milestones.append(_)
 
-    return chat_milestones
+    grp_milestones[1:] = sorted(grp_milestones[1:], key = lambda x: x[0])
+
+    return grp_milestones
 
 

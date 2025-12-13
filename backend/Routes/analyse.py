@@ -144,15 +144,28 @@ async def get_emojis_emoticons(
         "emojis_emoticons_used": combine_pairs_sum(pairs)
     }
 
-
 @router.get("/messages/{file_id}/punctuations", tags=[Tags.Analyse_Messages])
-async def get_punctuations(file_id: str):
+async def get_punctuations(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
+
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
-    return {"punctuations": analyser.get_punctuations(user_messages),}
+    result = analyser.get_punctuations(user_messages)
+    if user_wise: return {"punctuations": result,}
+
+    agg_counts = {}
+    for user_key in result:
+        punct_map = result[user_key]
+        for punct in punct_map:
+            agg_counts[punct] = agg_counts.get(punct, 0) +  punct_map[punct]["count"]
+
+    return {"punctuations": {punct: {"count": count} for punct, count in sorted(agg_counts.items(), key=lambda x: x[1], reverse=True)}}
 
 @router.get("/messages/{file_id}/profanity", tags=[Tags.Analyse_Messages])
 async def get_profanity(file_id: str):
+    # Nahh I am not doing user-wise for profanity, the structure is too complicated to be consolidated
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
     return {"profanity": analyser.get_profanity(user_messages),}
