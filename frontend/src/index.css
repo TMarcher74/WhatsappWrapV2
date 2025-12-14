@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* WhatsApp green theme */
+:root {
+  --wa-green: #25D366;
+  --wa-dark: #075E54;
+  --wa-bg: #111b21;
+}
+
+body {
+  background: var(--wa-bg);
+  color: white;
+  font-family: "Inter", sans-serif;
+}
+
+.slide-card {
+  background: #1f2c33;
+  border-radius: 20px;
+  padding: 25px;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.15);
+}
+
+@keyframes pulse-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 1.8s ease-in-out infinite;
+}

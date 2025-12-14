@@ -10,3 +10,4 @@ venv/
 
 # Python cache
 **/__pycache__/
+frontend/node_modules/

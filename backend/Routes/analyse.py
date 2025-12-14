@@ -345,7 +345,7 @@ async def anlayse_all(file_id: str):
     analysis = {
         "users": parsed_data.get_users(),
         "total_messages": analyser.get_messages_count(user_messages),
-        "word_character_stats": analyser.get_word_char_stats(user_messages),
+        "word_character_stats": analyser.get_message_stats(user_messages),
         "deleted_messages": analyser.get_messages_deleted_count(user_messages),
         "edited_messages": analyser.get_messages_edited_count(user_messages),
         "media": analyser.get_media_sent_count(user_messages),

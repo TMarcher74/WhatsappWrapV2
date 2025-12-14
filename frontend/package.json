@@ -1,0 +1,35 @@
+{
+  "name": "whatsapp-wrap-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@radix-ui/react-icons": "latest",
+    "class-variance-authority": "latest",
+    "d3": "^7.9.0",
+    "framer-motion": "^12.23.25",
+    "lucide-react": "^0.556.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-force-graph": "^1.48.1",
+    "react-force-graph-2d": "^1.29.0",
+    "react-force-graph-3d": "^1.29.0",
+    "react-icons": "^5.5.0",
+    "recharts": "latest",
+    "tailwindcss-animate": "latest",
+    "three": "^0.181.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.17",
+    "@vitejs/plugin-react": "latest",
+    "autoprefixer": "latest",
+    "postcss": "latest",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  }
+}
