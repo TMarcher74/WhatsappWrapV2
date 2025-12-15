@@ -2,6 +2,7 @@ import React from "react";
 import SlideWrapper from "../components/SlideWrapper";
 import ChartCard from "../components/ChartCard";
 import { PieChart, Pie, Tooltip, Cell, ResponsiveContainer } from "recharts";
+import ReactWordcloud from "react-wordcloud";
 import FadeIn from "../components/FadeIn";
 
 const COLORS = [
@@ -9,56 +10,71 @@ const COLORS = [
   "#6bcff6", "#7b6bff", "#ff6bcb",
   "#4ade80", "#60a5fa"
 ];
-const profanity = data.profanity || {};
-
 
 export default function Slide8_Profanity({ data }) {
-  if (!data) return null;
+  if (!data?.profanity) return null;
 
-  const perUser = data.profanity_user || {};
-  const global = data.profanity_global || {};
+  const profanity = data.profanity;
 
-  // Pie chart data
-const chartData = Object.entries(profanity).map(([user, words]) => ({
-  name: user,
-  value: Object.values(words || {}).reduce((a, b) => a + b, 0),
-}));
+  /* ---------------- PIE DATA (User-wise) ---------------- */
+  const pieData = Object.entries(profanity).map(([user, stats]) => ({
+    name: user,
+    value: stats.total_p_words || 0,
+  })).filter(d => d.value > 0);
 
+  /* ---------------- WORD CLOUD DATA ---------------- */
+  const globalWordCounts = {};
 
-const globalCounts = {};
-Object.values(profanity).forEach((words) => {
-  Object.entries(words || {}).forEach(([word, count]) => {
-    globalCounts[word] = (globalCounts[word] || 0) + count;
+  Object.values(profanity).forEach(userData => {
+    Object.entries(userData.canonical || {}).forEach(([word, meta]) => {
+      globalWordCounts[word] =
+        (globalWordCounts[word] || 0) + (meta.count || 0);
+    });
   });
-});
 
-const topWords = Object.entries(globalCounts)
-  .sort((a, b) => b[1] - a[1])
-  .slice(0, 12);
+  const wordCloudData = Object.entries(globalWordCounts)
+    .map(([text, value]) => ({ text, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 50); // limit for readability
 
+  /* ---------------- WORD CLOUD OPTIONS ---------------- */
+  const wordCloudOptions = {
+    rotations: 2,
+    rotationAngles: [0, 0],
+    fontSizes: [18, 70],
+    padding: 2,
+    enableTooltip: true,
+  };
 
   return (
     <SlideWrapper>
-      <ChartCard title="Profanity Breakdown">
+      <ChartCard title="😡 Profanity Breakdown">
+
         <FadeIn delay={0.2}>
-          <p className="text-gray-300 text-lg mb-4">
-            A breakdown of profanity usage by each participant.
-            The chart shows how often each user used words from your profanity list.
+          <p className="text-gray-300 text-lg mb-6 max-w-3xl">
+            This slide shows how often profanity appeared in the conversation.
+            The pie chart represents user-wise usage, while the word cloud highlights
+            the most frequently used profane words.
           </p>
         </FadeIn>
 
-        {/* Pie Chart */}
-        <div className="w-full h-80">
-          <ResponsiveContainer>
+        {/* ---------------- PIE CHART ---------------- */}
+        <div className="w-full h-[420px] flex justify-center items-center mb-12">
+          <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={chartData}
+                data={pieData}
                 dataKey="value"
                 nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={70}
                 outerRadius={120}
-                label
+                paddingAngle={2}
+                labelLine={false}
+                label={({ value }) => value}
               >
-                {chartData.map((entry, index) => (
+                {pieData.map((_, index) => (
                   <Cell key={index} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
@@ -67,22 +83,22 @@ const topWords = Object.entries(globalCounts)
           </ResponsiveContainer>
         </div>
 
-        {/* Top profanity words */}
+        {/* ---------------- WORD CLOUD ---------------- */}
         <FadeIn delay={0.4}>
-          <h2 className="text-xl font-semibold mt-10 mb-3">Top Profanity Words</h2>
-          {topWords.length === 0 ? (
-            <p className="text-gray-400">No profanity detected. Good job everyone 😇</p>
+          <h2 className="text-2xl font-semibold text-white text-center mb-6">
+            Most Used Profanity
+          </h2>
+
+          {wordCloudData.length === 0 ? (
+            <p className="text-gray-400 text-center">
+              No profanity detected. Everyone behaved 😇
+            </p>
           ) : (
-            <div className="grid grid-cols-2 gap-3 text-white">
-              {topWords.map(([word, count]) => (
-                <div
-                  key={word}
-                  className="bg-gray-800 p-3 rounded-xl flex justify-between"
-                >
-                  <span className="font-medium">{word}</span>
-                  <span className="text-green-400">{count}</span>
-                </div>
-              ))}
+            <div className="w-full h-[320px] bg-slate-900 rounded-xl p-4">
+              <ReactWordcloud
+                words={wordCloudData}
+                options={wordCloudOptions}
+              />
             </div>
           )}
         </FadeIn>

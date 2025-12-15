@@ -6,7 +6,6 @@ import FadeIn from "./components/FadeIn";
 import SlideNumber from "./components/SlideNumber";
 import TypingHeader from "./components/TypingHeader";
 
-import { normalizeAnalysis } from "./util/normalizeAnalysis";
 
 import Slide1_Overview from "./slides/Slide1_Overview";
 import Slide2_MessageShare from "./slides/Slide2_MessageShare";
@@ -15,7 +14,7 @@ import Slide4_ActiveHours from "./slides/Slide4_ActiveHours";
 import Slide5_MessageQuality from "./slides/Slide5_MessageQuality";
 import Slide6_LinksStats from "./slides/Slide6_LinksStats";
 import Slide7_InteractionGraph from "./slides/Slide7_InteractionGraph";
-// import Slide8_Profanity from "./slides/Slide8_Profanity";
+import Slide8_Profanity from "./slides/Slide8_Profanity";
 
 export default function App() {
   const [data, setData] = useState(null);
@@ -31,8 +30,8 @@ export default function App() {
 { id: "slide4", component: <Slide4_ActiveHours data={data} /> },
 { id: "slide5", component: <Slide5_MessageQuality data={data} /> },
  { id: "slide6", component: <Slide6_LinksStats data={data} /> },
-    { id: "slide7", component: <Slide7_InteractionGraph data={data} /> }
-//     { id: "slide8", component: <Slide8_Profanity data={data} /> }
+    { id: "slide7", component: <Slide7_InteractionGraph data={data} /> },
+    { id: "slide8", component: <Slide8_Profanity data={data} /> }
   ];
 
   async function handleUpload(file) {
@@ -58,10 +57,8 @@ export default function App() {
 const analyseJson = await analyseRes.json();
 console.log("RAW ANALYSE DATA:", analyseJson);
 
-const normalized = normalizeAnalysis(analyseJson);
-console.log("NORMALIZED DATA:", normalized);
+setData(analyseJson);
 
-setData(normalized);
 
     } catch (err) {
       console.error("Upload/Analyse error:", err);
