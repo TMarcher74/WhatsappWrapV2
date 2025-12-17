@@ -15,6 +15,7 @@ import Slide5_MessageQuality from "./slides/Slide5_MessageQuality";
 import Slide6_LinksStats from "./slides/Slide6_LinksStats";
 import Slide7_InteractionGraph from "./slides/Slide7_InteractionGraph";
 import Slide8_Profanity from "./slides/Slide8_Profanity";
+import Slide9_EmojiStory from "./slides/Slide9_EmojiStory";
 
 export default function App() {
   const [data, setData] = useState(null);
@@ -27,11 +28,12 @@ export default function App() {
     { id: "slide1", component: <Slide1_Overview data={data} /> },
     { id: "slide2", component: <Slide2_MessageShare data={data} /> },
     { id: "slide3", component: <Slide3_UserBreakdown data={data} /> },
-{ id: "slide4", component: <Slide4_ActiveHours data={data} /> },
-{ id: "slide5", component: <Slide5_MessageQuality data={data} /> },
- { id: "slide6", component: <Slide6_LinksStats data={data} /> },
+    { id: "slide4", component: <Slide4_ActiveHours data={data} /> },
+    { id: "slide5", component: <Slide5_MessageQuality data={data} /> },
+    { id: "slide6", component: <Slide6_LinksStats data={data} /> },
     { id: "slide7", component: <Slide7_InteractionGraph data={data} /> },
-    { id: "slide8", component: <Slide8_Profanity data={data} /> }
+    { id: "slide8", component: <Slide8_Profanity data={data} /> },
+    { id: "slide9", component: <Slide9_EmojiStory data={data} /> }
   ];
 
   async function handleUpload(file) {

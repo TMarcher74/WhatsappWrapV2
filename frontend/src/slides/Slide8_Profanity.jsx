@@ -1,7 +1,11 @@
 import React from "react";
 import SlideWrapper from "../components/SlideWrapper";
 import ChartCard from "../components/ChartCard";
-import { PieChart, Pie, Tooltip, Cell, ResponsiveContainer } from "recharts";
+import {   BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Legend,PieChart, Pie, Tooltip, Cell, ResponsiveContainer } from "recharts";
 import ReactWordcloud from "react-wordcloud";
 import FadeIn from "../components/FadeIn";
 
@@ -15,6 +19,10 @@ export default function Slide8_Profanity({ data }) {
   if (!data?.profanity) return null;
 
   const profanity = data.profanity;
+
+  const worstOffender = Object.entries(profanity)
+  .sort((a, b) => b[1].total_p_words - a[1].total_p_words)[0];
+
 
   /* ---------------- PIE DATA (User-wise) ---------------- */
   const pieData = Object.entries(profanity).map(([user, stats]) => ({
@@ -46,36 +54,49 @@ export default function Slide8_Profanity({ data }) {
     enableTooltip: true,
   };
 
+  const comparisonData = Object.keys(profanity).map(user => ({
+  user,
+  messages: data.total_messages?.[user] || 0,
+  profanity: profanity[user].total_p_words || 0
+}));
+
+
   return (
-    <SlideWrapper>
-      <ChartCard title="😡 Profanity Breakdown">
+  <SlideWrapper>
+    <ChartCard title="Profanity Breakdown">
 
-        <FadeIn delay={0.2}>
-          <p className="text-gray-300 text-lg mb-6 max-w-3xl">
-            This slide shows how often profanity appeared in the conversation.
-            The pie chart represents user-wise usage, while the word cloud highlights
-            the most frequently used profane words.
+      {/* FORCE COLUMN LAYOUT */}
+      <div className="flex flex-col w-full">
+
+        <p className="text-gray-300 text-lg mb-6">
+          Profanity usage across participants and the most commonly used words.
+        </p>
+
+        <div className="mb-6 text-center">
+          <p className="text-xl font-semibold text-red-400">
+            🚨 Worst Offender: {worstOffender[0]}
           </p>
-        </FadeIn>
+          <p className="text-gray-400">
+            {worstOffender[1].total_p_words} profane words
+            ({worstOffender[1].total_percentage.toFixed(2)}%)
+          </p>
+        </div>
 
-        {/* ---------------- PIE CHART ---------------- */}
-        <div className="w-full h-[420px] flex justify-center items-center mb-12">
-          <ResponsiveContainer width="100%" height="100%">
+
+        {/* ================= PIE CHART ================= */}
+        <div className="w-full h-[320px] flex justify-center mb-12">
+          <ResponsiveContainer width="70%" height="100%">
             <PieChart>
               <Pie
                 data={pieData}
                 dataKey="value"
                 nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={70}
                 outerRadius={120}
-                paddingAngle={2}
                 labelLine={false}
-                label={({ value }) => value}
+                label={({ name }) => name}
               >
-                {pieData.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                {pieData.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
@@ -83,27 +104,82 @@ export default function Slide8_Profanity({ data }) {
           </ResponsiveContainer>
         </div>
 
-        {/* ---------------- WORD CLOUD ---------------- */}
-        <FadeIn delay={0.4}>
-          <h2 className="text-2xl font-semibold text-white text-center mb-6">
-            Most Used Profanity
+        {/* ================= WORD CLOUD ================= */}
+        <div className="w-full flex justify-center">
+          <div className="w-[90%] h-[320px]">
+            <ReactWordcloud
+              words={wordCloudData}
+              options={{
+                rotations: 2,
+                rotationAngles: [-90, 0],
+                fontSizes: [14, 60],
+                padding: 4,
+                deterministic: true
+              }}
+            />
+          </div>
+        </div>
+
+        {/* ================= PROFANITY vs MESSAGE VOLUME ================= */}
+        <div className="w-full mt-16">
+          <h2 className="text-2xl font-semibold text-center mb-6">
+            Profanity vs Message Volume
           </h2>
 
-          {wordCloudData.length === 0 ? (
-            <p className="text-gray-400 text-center">
-              No profanity detected. Everyone behaved 😇
-            </p>
-          ) : (
-            <div className="w-full h-[320px] bg-slate-900 rounded-xl p-4">
-              <ReactWordcloud
-                words={wordCloudData}
-                options={wordCloudOptions}
-              />
-            </div>
-          )}
-        </FadeIn>
+          <div className="w-full h-[380px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={comparisonData}
+                margin={{ top: 20, right: 40, left: 20, bottom: 60 }}
+              >
+                <XAxis
+                  dataKey="user"
+                  angle={-25}
+                  textAnchor="end"
+                  interval={0}
+                  height={80}
+                />
 
-      </ChartCard>
-    </SlideWrapper>
-  );
+                {/* Left axis → messages */}
+                <YAxis
+                  yAxisId="left"
+                  orientation="left"
+                  stroke="#60a5fa"
+                />
+
+                {/* Right axis → profanity */}
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  stroke="#ef4444"
+                />
+
+                <Tooltip />
+                <Legend />
+
+                <Bar
+                  yAxisId="left"
+                  dataKey="messages"
+                  name="Total Messages"
+                  fill="#60a5fa"
+                  radius={[6, 6, 0, 0]}
+                />
+
+                <Bar
+                  yAxisId="right"
+                  dataKey="profanity"
+                  name="Profanity Words"
+                  fill="#ef4444"
+                  radius={[6, 6, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+      </div>
+    </ChartCard>
+  </SlideWrapper>
+);
+
 }
