@@ -8,7 +8,7 @@ class Parser:
         self.chat_text = chat_text
         self.user_messages, self.system_messages = self._parse_to_list()
 
-    def _parse_to_list(self) -> (list[dict], list[dict]):
+    def _parse_to_list(self) -> tuple[list[dict], list[dict]]:
         """
         Split the raw chat into timestamped entries, then classify each entry
         as a user message (has 'Sender: ') or a system message (no sender).
@@ -93,14 +93,14 @@ class Parser:
         """
         Gets the usernames with respect to each message
         """
-        return list(msg["sender"] for msg in self.user_messages if msg["sender"] != "Meta AI")
+        return list(msg["sender"] for msg in self.user_messages)
 
     def get_users(self) -> list[str]:
         """
         Gets the usernames of everyone in thr group
         Note: Does not work if they have never sent a message
         """
-        return list(set(msg["sender"] for msg in self.user_messages if msg["sender"] != "Meta AI"))
+        return list(set(msg["sender"] for msg in self.user_messages))
 
     def get_messages_by_user(self, user:str = None) -> list[str]:
         """
