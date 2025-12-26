@@ -611,7 +611,7 @@ def get_top_convos(
             Convos ordered by messages per minute times unique participants per minute
     """
 
-    if len(date_times) != len(messages) != len(users):
+    if not (len(date_times) == len(messages) == len(users)):
         return {"Error": "Length of dates, messages and users list do not match!"}
     combined = sorted(zip(date_times, users, messages), key=lambda x: x[0])
     date_times, users, messages = zip(*combined)
