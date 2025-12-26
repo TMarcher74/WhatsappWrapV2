@@ -16,6 +16,7 @@ import Slide6_LinksStats from "./slides/Slide6_LinksStats";
 import Slide7_InteractionGraph from "./slides/Slide7_InteractionGraph";
 import Slide8_Profanity from "./slides/Slide8_Profanity";
 import Slide9_EmojiStory from "./slides/Slide9_EmojiStory";
+import Slide10_TopConvos from "./slides/Slide10_TopConvos";
 
 export default function App() {
   const [data, setData] = useState(null);
@@ -33,7 +34,8 @@ export default function App() {
     { id: "slide6", component: <Slide6_LinksStats data={data} /> },
     { id: "slide7", component: <Slide7_InteractionGraph data={data} /> },
     { id: "slide8", component: <Slide8_Profanity data={data} /> },
-    { id: "slide9", component: <Slide9_EmojiStory data={data} /> }
+    { id: "slide9", component: <Slide9_EmojiStory data={data} /> },
+    { id: "slide10", component: <Slide10_TopConvos data={data} />}
   ];
 
   async function handleUpload(file) {
