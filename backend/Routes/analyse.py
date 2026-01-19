@@ -1,5 +1,5 @@
 import itertools
-from fastapi import APIRouter, HTTPException, status, Form
+from fastapi import APIRouter, HTTPException, status
 from backend.Util.constants import file_cache
 from backend.Util.enums import Tags
 from fastapi.params import Query
@@ -345,7 +345,7 @@ async def anlayse_all(file_id: str):
     analysis = {
         "users": parsed_data.get_users(),
         "total_messages": analyser.get_messages_count(user_messages),
-        "word_character_stats": analyser.get_message_stats(user_messages),
+        "message_stats": analyser.get_message_stats(user_messages),
         "deleted_messages": analyser.get_messages_deleted_count(user_messages),
         "edited_messages": analyser.get_messages_edited_count(user_messages),
         "media": analyser.get_media_sent_count(user_messages),
