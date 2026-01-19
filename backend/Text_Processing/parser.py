@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import datetime
 import re
 from backend.Util.constants import ACTIONS
+from dateutil import parser
 
 class Parser:
     def __init__(self, chat_text: str):
@@ -18,24 +19,28 @@ class Parser:
         #split on timestamp boundaries (keep each chunk starting with a timestamp)
         # (?m) => multiline so ^ matches line-start
         # (?=...) => lookahead so split keeps the boundary as part of the chunk
-        entry_split_re = re.compile(r'(?m)(?=^\d{2}/\d{2}/\d{4},\s+\d{2}:\d{2}\s+-\s)')
+        entry_split_re = re.compile(
+            r'(?m)(?=^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}[,\s]+\d{1,2}[:.]\d{2}\s*(?:[ap]m)?\s*-\s*)',
+            re.IGNORECASE
+        )
         chunks = entry_split_re.split(self.chat_text.strip())
 
-        #regex to parse an entry into date/time and optional sender + the rest as content
-        # - date/time are captured
-        # - (?:(?P<sender>[^:]+):\s*)? matches "Sender: " optionally (if present it's a user msg)
-        # - (?P<content>.*) with DOTALL captures all following lines (multiline message)
+        #regex to capture an entry of date/time and optional sender + the rest as content
         entry_re = re.compile(
             r'^\s*'
-            r'(?P<date>\d{2}/\d{2}/\d{4}),\s*'
-            r'(?P<time>\d{2}:\d{2})\s*-\s*'
+            r'(?P<date>\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})'
+            r'[,\s]+'
+            r'(?P<time>\d{1,2}[:.]\d{2}\s*(?:[ap]m)?)'
+            r'\s*-\s*'
             r'(?:(?P<sender>[^:]+):\s*)?'
             r'(?P<content>.*)$',
-            re.DOTALL | re.MULTILINE
+            re.DOTALL | re.MULTILINE | re.IGNORECASE
         )
 
         user_messages = []
         system_messages = []
+
+        date_format, time_format = self.sniff_date_time_format()
 
         for chunk in chunks:
             if not chunk.strip():
@@ -52,8 +57,18 @@ class Parser:
                 })
                 continue
 
-            date = datetime.strptime(m.group('date'), "%d/%m/%Y").date()
-            time = datetime.strptime(m.group('time'), "%H:%M").time()
+            def parse_with_strptime(date_str, time_str, date_format, time_format):
+                # format codes to strptime format strings
+                date_fmt_map = {'EU': '%d/%m/%Y', 'US': '%m/%d/%y'}
+                time_fmt_map = {'24H': '%H:%M', '12H': '%I:%M %p'}
+
+                #Combine and parse
+                fmt_string = f'{date_fmt_map[date_format]} {time_fmt_map[time_format]}'
+                return datetime.strptime(f'{date_str.strip()} {time_str.strip()}', fmt_string)
+
+            date_time = parse_with_strptime(m.group('date'), m.group('time'), date_format, time_format)
+            date = date_time.date()
+            time = date_time.time()
             sender = m.group('sender')
             content = m.group('content').rstrip()
 
@@ -81,6 +96,53 @@ class Parser:
                     msg.update(handler(parts))
 
         return user_messages, system_messages
+
+    def sniff_date_time_format(self) -> tuple[str, str]:
+        """
+        Sniff the date/time format from the first valid timestamp in the chat.
+        Returns (date_format, time_format)
+        """
+        lines = self.chat_text.strip().split('\n')
+
+        # Look for the first line with a timestamp
+        timestamp_re = re.compile(
+            r'^\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})[,\s]+(\d{1,2}[:.]\d{2}\s*(?:[ap]m)?)',
+            re.IGNORECASE
+        )
+
+        # Default
+        date_format = 'EU'
+        time_format = '24H'
+
+        for line in lines:
+            match = timestamp_re.match(line)
+            if match:
+                date_str, time_str = match.groups()
+
+                # Determine time format
+                time_format = '12H' if ('am' in time_str.lower() or 'pm' in time_str.lower()) else '24H'
+
+                # Determine date format
+                # Normalize and split
+                normalized_date = re.sub(r'[-./]', '/', date_str)
+                parts = normalized_date.split('/')
+
+                if len(parts) == 3:
+                    first, second, _ = parts
+                    first_int = int(first) if first.isdigit() else 0
+                    second_int = int(second) if second.isdigit() else 0
+
+                    if first_int > 12:
+                        date_format = 'EU'  # First part > 12 must be day
+                        break
+                    elif second_int > 12:
+                        date_format = 'US'  # Second part > 12 must be month
+                        break
+                    else:
+                        # Ambiguous
+                        continue
+
+        return date_format, time_format
 
     def is_group(self) -> bool:
         """
