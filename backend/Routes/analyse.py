@@ -339,7 +339,7 @@ async def get_responses(file_id: str):
 
 
 @router.post("/all/{file_id}")
-async def anlayse_all(file_id: str):
+async def analyse_all(file_id: str):
     # Retrieve parsed data from cache
     parsed_data = verify_parsed_data(file_id)
 
