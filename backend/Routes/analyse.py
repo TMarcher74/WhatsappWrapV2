@@ -74,6 +74,17 @@ async def get_edited_messages(
                                                                   analyser.get_messages_edited_count(user_messages)),}
     return {"edited_messages": sum([val for val in analyser.get_messages_edited_count(user_messages).values()])}
 
+@router.get("/messages/{file_id}/asterisk_edited", tags=[Tags.Analyse_Messages])
+async def get_asterisk_edited_messages(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    if user_wise: return {"asterisk_edited_messages": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                                                  analyser.get_messages_edited_using_asterisk_count(user_messages)),}
+    return {"asterisk_edited_messages": sum([val for val in analyser.get_messages_edited_using_asterisk_count(user_messages).values()])}
+
 @router.get("/messages/{file_id}/media", tags=[Tags.Analyse_Messages])
 async def get_media(
         file_id: str,

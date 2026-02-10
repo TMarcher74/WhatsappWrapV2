@@ -15,8 +15,9 @@ from backend.Util.constants import DOMAIN_MAPS, SysMsgActions
 from math import sqrt
 import yaml
 
-TOKEN_RE = re.compile(r"\b\w+(?:'\w+)?\b")
+RE_TOKEN = re.compile(r"\b\w+(?:'\w+)?\b")
 RE_REPS = re.compile(r"(.)\1+")         # (keep only 2 of same char)
+RE_EDIT = re.compile(r"^\*(?!\*)([^*\n]+)$|^([^*\n]+)\*(?!\*)$")
 
 nltk.download('stopwords')
 nltk.download('punkt_tab')
@@ -179,6 +180,19 @@ def get_messages_edited_count(user_messages: dict) -> dict[str, int]:
     """
     edited_messages = "<This message was edited>"
     return get_messages_count(user_messages, edited_messages)
+
+def get_messages_edited_using_asterisk_count(user_messages: dict) -> dict[str, int]:
+    """
+        Gets the count of edited messages by each user in this format: *correction
+    """
+    message_count = {}
+    for user, messages in user_messages.items():
+        count = 0
+        for msg in messages:
+            count += sum(1 for _ in RE_EDIT.finditer(msg))
+        message_count[user] = count
+
+    return message_count
 
 def get_media_sent_count(user_messages: dict) -> dict[str, int]:
     """
@@ -419,7 +433,7 @@ def get_profanity(user_messages: dict):
     for user, messages in user_messages.items():
 
         text = " ".join(m.lower() for m in (messages or []))
-        tokens = TOKEN_RE.findall(text)
+        tokens = RE_TOKEN.findall(text)
         total_words = len(text.split())
 
         form_counter = Counter()
