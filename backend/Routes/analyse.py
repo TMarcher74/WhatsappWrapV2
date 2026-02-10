@@ -359,6 +359,7 @@ async def anlayse_all(file_id: str):
         "message_stats": analyser.get_message_stats(user_messages),
         "deleted_messages": analyser.get_messages_deleted_count(user_messages),
         "edited_messages": analyser.get_messages_edited_count(user_messages),
+        "asterisk_edited_messages": analyser.get_messages_edited_using_asterisk_count(user_messages),
         "media": analyser.get_media_sent_count(user_messages),
         "links": links,
         "detailed_links": detailed_links,
