@@ -201,6 +201,21 @@ def get_media_sent_count(user_messages: dict) -> dict[str, int]:
     media_message = "<Media omitted>"
     return get_messages_count(user_messages, media_message)
 
+def get_view_once_media_count(user_messages: dict) -> dict[str, int]:
+    """
+    Gets the count of view once media sent by each user
+    """
+    view_once_media_message = ""
+    message_count = {}
+    for user, messages in user_messages.items():
+        count = 0
+        for msg in messages:
+            if msg == view_once_media_message:
+                count += 1
+        message_count[user] = count
+
+    return message_count
+
 def get_mentions_count(user_messages: dict, user: str) -> dict[str, int]:
     """
     Gets the count of mentions of a user

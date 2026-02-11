@@ -74,7 +74,7 @@ async def get_edited_messages(
                                                                   analyser.get_messages_edited_count(user_messages)),}
     return {"edited_messages": sum([val for val in analyser.get_messages_edited_count(user_messages).values()])}
 
-@router.get("/messages/{file_id}/asterisk_edited", tags=[Tags.Analyse_Messages])
+@router.get("/messages/{file_id}/asterisk-edited", tags=[Tags.Analyse_Messages])
 async def get_asterisk_edited_messages(
         file_id: str,
         user_wise: bool = Query(False, description= "Gives result with respect to each user")
@@ -95,6 +95,17 @@ async def get_media(
     if user_wise: return {"media": analyser.get_ratioed(analyser.get_messages_count(user_messages),
                                                         analyser.get_media_sent_count(user_messages)),}
     return {"media": sum([val for val in analyser.get_media_sent_count(user_messages).values()])}
+
+@router.get("/messages/{file_id}/view-once-media", tags=[Tags.Analyse_Messages])
+async def get_view_once_media(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    if user_wise: return {"view_once_media": analyser.get_ratioed(analyser.get_messages_count(user_messages),
+                                                        analyser.get_view_once_media_count(user_messages)),}
+    return {"view_once_media": sum([val for val in analyser.get_view_once_media_count(user_messages).values()])}
 
 
 @router.get("/messages/{file_id}/links", tags=[Tags.Analyse_Messages])
@@ -181,7 +192,7 @@ async def get_profanity(file_id: str):
     user_messages = get_user_messages(parsed_data)
     return {"profanity": analyser.get_profanity(user_messages),}
 
-@router.get("/messages/{file_id}/top_words", tags=[Tags.Analyse_Messages])
+@router.get("/messages/{file_id}/top-words", tags=[Tags.Analyse_Messages])
 async def get_top_words(
         file_id: str,
         top_n: int = Query(30, ge = 1, le = 100, description = "Number of top words to return"),
