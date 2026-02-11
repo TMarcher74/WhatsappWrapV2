@@ -176,7 +176,7 @@ async def get_punctuations(
 
 @router.get("/messages/{file_id}/profanity", tags=[Tags.Analyse_Messages])
 async def get_profanity(file_id: str):
-    # Nahh I am not doing user-wise for profanity, the structure is too complicated to be consolidated
+    # not doing user-wise for profanity, the structure is too complicated to be consolidated
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
     return {"profanity": analyser.get_profanity(user_messages),}

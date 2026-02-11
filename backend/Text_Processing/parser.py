@@ -2,7 +2,6 @@ from collections import defaultdict
 from datetime import datetime
 import re
 from backend.Util.constants import ACTIONS
-from dateutil import parser
 
 class Parser:
     def __init__(self, chat_text: str):
@@ -172,7 +171,7 @@ class Parser:
             return [msg["message"] for msg in self.user_messages]
         return [msg["message"] for msg in self.user_messages if msg["sender"] == user]
 
-    def get_date_and_messages_by_user(self, user:str = None) -> dict[datetime.date, list[str]]:
+    def get_date_and_messages_by_user(self, user:str = None) -> dict[datetime, list[str]]:
         """
         Get messages sent by a user
         """
@@ -200,7 +199,7 @@ class Parser:
             for msg in self.user_messages if msg["sender"] == user
         ]
 
-    def get_date_by_user(self, user:str = None) -> list[datetime.time]:
+    def get_date_by_user(self, user:str = None) -> list[datetime]:
         """
         Get dates of messages sent by a user
         """
@@ -208,7 +207,7 @@ class Parser:
             return [msg["date"] for msg in self.user_messages]
         return [msg["date"] for msg in self.user_messages if msg["sender"] == user]
 
-    def get_time_by_user(self, user:str = None) -> list[datetime.time]:
+    def get_time_by_user(self, user:str = None) -> list[datetime]:
         """
         Get time of messages sent by a user
         """
