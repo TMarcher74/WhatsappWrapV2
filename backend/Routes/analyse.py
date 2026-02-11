@@ -116,9 +116,11 @@ async def get_links(
     parsed_data = verify_parsed_data(file_id)
     user_messages = get_user_messages(parsed_data)
     url_count, detailed_url_count = analyser.get_links(user_messages)
-    if user_wise: return {"url_count": analyser.get_ratioed(analyser.get_messages_count(user_messages),
-                                                            url_count),
-                          "detailed_url_count": detailed_url_count}
+    if user_wise:
+        return {
+            "url_count": analyser.get_ratioed(analyser.get_messages_count(user_messages), url_count),
+            "detailed_url_count": detailed_url_count
+        }
 
     list_of_dicts = [lis[0] for lis in detailed_url_count.values()]
     res = defaultdict(int)
@@ -129,6 +131,24 @@ async def get_links(
         "url_count": sum([val for val in url_count.values()]),
         "detailed_url_count": [dict(sorted(res.items(), key=lambda x:x[1], reverse=True)),
                                list(itertools.chain.from_iterable(lis[1] for lis in detailed_url_count.values()))]
+    }
+
+@router.get("/messages/{file_id}/polls", tags=[Tags.Analyse_Messages])
+async def get_polls(
+        file_id: str,
+        user_wise: bool = Query(False, description= "Gives result with respect to each user")
+):
+    parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
+    poll_count, detailed_poll_count = analyser.get_poll_count(user_messages)
+    if user_wise:
+        return {
+            "url_count": analyser.get_ratioed(analyser.get_messages_count(user_messages), poll_count),
+            "detailed_url_count": detailed_poll_count
+        }
+    return {
+        "url_count": sum([val for val in poll_count.values()]),
+        "detailed_url_count": [item for val in detailed_poll_count.values() if val != [] for item in val]   # Flattened the 2D list
     }
 
 @router.get("/messages/{file_id}/mentions", tags=[Tags.Analyse_Messages])

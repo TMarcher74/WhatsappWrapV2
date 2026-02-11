@@ -336,6 +336,23 @@ def get_links(user_messages: dict):
 
     return url_count, detailed_url_count
 
+def get_poll_count(user_messages: dict) -> tuple[dict, dict]:
+    """
+    Gets the count of polls put up by each user
+    """
+    poll_message = ["POLL:"]
+    poll_count, detailed_poll_count = {}, {}
+    for user, messages in user_messages.items():
+        count = 0
+        polls = []
+        for msg in messages:
+            if any(check in msg for check in poll_message):
+                count += 1
+                polls.append(msg[6:])
+        poll_count[user] = count
+        detailed_poll_count[user] = polls
+    return poll_count, detailed_poll_count
+
 def get_punctuations(user_messages: dict):
     """
     Get count of all the punctuations used by a user
