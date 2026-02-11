@@ -9,14 +9,12 @@ Routes:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from Routes import status, analyse, upload
+from Routes import status, analyse, upload, debug
 import uvicorn
 
 app = FastAPI()
 
-# -----------------------------
-# ⭐ ENABLE CORS FOR FRONTEND
-# -----------------------------
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],          # or ["http://localhost:5173"]
@@ -28,6 +26,7 @@ app.add_middleware(
 app.include_router(status.router)
 app.include_router(upload.router)
 app.include_router(analyse.router)
+app.include_router(debug.router)
 
 
 # Backend start here, run main to run backend

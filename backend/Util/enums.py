@@ -3,6 +3,7 @@ from enum import Enum
 # Tags for different routes and paths
 class Tags(Enum):
     Status = "Status"
+    Debug = "Debug"
     Upload = "Upload"
     Analyse_Users = "Analyse Users"
     Analyse_Messages = "Analyse Messages"
