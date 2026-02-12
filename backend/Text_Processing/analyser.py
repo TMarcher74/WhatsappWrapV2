@@ -799,10 +799,14 @@ def get_detailed_timeseries(user_messages: dict, users: list[str], dates: list[d
                                                        "characters/message": 0,
                                                        "deleted": 0,
                                                        "edited": 0,
+                                                       "asterisk_edited": 0,
                                                        "media": 0,
+                                                       "view_once_media": 0,
                                                        "links": 0,
+                                                       "polls": 0,
                                                        "emojis": 0,
-                                                       "emoticons": 0}))
+                                                       "emoticons": 0,
+                                                       "punctuations": 0}))
 
     # Initialising for all users
     for date in dates:
@@ -830,10 +834,14 @@ def get_detailed_timeseries(user_messages: dict, users: list[str], dates: list[d
 
             counter[date][user]["deleted"] += sum(get_messages_deleted_count({user: messages_}).values())
             counter[date][user]["edited"] += sum(get_messages_edited_count({user: messages_}).values())
+            counter[date][user]["asterisk_edited"] += sum(get_messages_edited_using_asterisk_count({user: messages_}).values())
             counter[date][user]["media"] += sum(get_media_sent_count({user: messages_}).values())
+            counter[date][user]["view_once_media"] += sum(get_view_once_media_count({user: messages_}).values())
             counter[date][user]["links"] += sum(get_links({user: messages_})[0].values())
+            counter[date][user]["polls"] += sum(get_poll_count({user: messages_})[0].values())
             counter[date][user]["emojis"] += sum(emojis.values())
             counter[date][user]["emoticons"] += sum(emoticons.values())
+            counter[date][user]["punctuations"] += sum(punct["count"] for item in get_punctuations({user: messages_}).values() for punct in item.values())
 
     return counter
 
