@@ -264,6 +264,14 @@ async def get_collocations(file_id: str,
                                                       top_n,
                                                       avoid_fake_pairing)}
 
+@router.get("/messages/{file_id}/birthdays", tags=[Tags.Analyse_Messages])
+async def get_birthdays(file_id: str):
+    parsed_data = verify_parsed_data(file_id)
+
+    return {"birthdays": analyser.get_birthdays(parsed_data.get_messages_by_user(),
+                                                parsed_data.get_users_wrt_messages(),
+                                                parsed_data.get_date_by_user())}
+
 # Time
 @router.get("/time/{file_id}/streak", tags=[Tags.Analyse_Time])
 async def get_longest_streak(file_id: str):

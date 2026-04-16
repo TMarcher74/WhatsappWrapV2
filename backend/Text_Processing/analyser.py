@@ -378,6 +378,11 @@ def get_punctuations(user_messages: dict):
 
     return punct_count
 
+# Moved it out since both profanity and bday function need it
+def remove_repetitions(word, reps: int = 2):
+    repeats = r"\1" * reps
+    return RE_REPS.sub(fr'{repeats}', word)
+
 def get_profanity(user_messages: dict):
     """
     Get count of all the punctuations used by a user
@@ -431,9 +436,6 @@ def get_profanity(user_messages: dict):
                 chars = set(w)
 
         return w
-
-    def remove_repetitions(word):
-        return RE_REPS.sub(r'\1\1', word)
 
     def word_matches_profanity(word):
         if len(word) < 2: return None
@@ -501,11 +503,6 @@ def get_profanity(user_messages: dict):
         }
 
     return results
-
-def get_birthdays(user_messages: dict):
-    for user, messages in user_messages.items():
-        for msg in messages:
-            pass
 
 def get_message_stats(user_messages: dict, user_wise: bool = True):
     """
@@ -731,9 +728,9 @@ def get_top_convos(
         "gap threshold in seconds": gap_thresh.total_seconds(),
         "Longest conversation": longest_conversation,
         "Most messages conversation": most_messages_conversation,
-        f"Top {top_n} by messages / min":
+        f"Top {top_n} by messages/min":
             sorted(all_conversations, key=lambda x: x["messages_per_min"], reverse=True)[:top_n],
-        f"Top {top_n} by messages / min * unique participants / min":
+        f"Top {top_n} by messages/min * unique participants/min":
             sorted(all_conversations,
                    key=lambda x: x["messages_per_min"] * x["unique_participants_per_min"], reverse=True)[:top_n],
     }
@@ -882,44 +879,212 @@ def normalise_reply_map(
         "interaction_strength": dict(interaction_strength),
     }
 
+def get_birthdays(
+        messages: list[str],
+        user_list: list[str],
+        dates: list[date],
+):
+    """
+    Finds birthdays of each user and uses a confidence score for each
+    Steps:
+    1. Find a birthday event trigger
+    2. Start a 24hr window to search
+    3. Extract explicit mentions, ex, "happy birthday @Homie"
+    4. Eliminate users who wished and focus on "Thank yous"
+    5. Assign confidence scores
+    6. Reaffirm over long-term repetition, if dataset allows
+    """
+    BDAY_TRIGGER_WORDS = [
+        # Set with no repeating letters because the message will be run through a repetition remover,
+        # to catch happyyy birthayyyys
+        "hapy birthday",
+        "hapy bday",
+        "hapi bday",
+        "\bhbd\b",
+        "many hapy returns",
+        "birthday wishes"
+    ]
+
+    TEMPORAL_MODIFIERS = {
+        # shifts inferred birthday relative to message date
+        "belated": +1,  # bday was yesterday or earlier
+        "late": +1,
+        "advanced": -1,  # bday is tomorrow or later
+        "advance": -1,
+        "early": -1,
+        "upcoming": -1,
+    }
+
+    def get_trigger_match(text: str, trigger_patterns: list[str]) -> tuple[str, int] | None:
+        for pattern in trigger_patterns:
+            if pattern in text:
+                return pattern, text.find(pattern)
+        return None
+
+    def find_birthday_events():
+        events = []
+        current_event: dict = None
+
+        def close_event(event):
+            """Finalise and append a completed event."""
+            if event:
+                events.append(event)
+
+        def make_event(index, match, match_index):
+            msg_date = dates[index]
+            raw_msg = messages[index].lower()
+            date_offset = 0
+            active_modifiers = []
+
+            for mod, offset in TEMPORAL_MODIFIERS.items():
+                if mod in raw_msg:
+                    date_offset += offset
+                    active_modifiers.append(mod)
+
+            inferred_bday = msg_date + timedelta(days=date_offset)
+
+            multi_target = " and " in raw_msg #for multiple bdays on the same day
+
+            return {
+                "trigger_date": msg_date,
+                "inferred_bday": inferred_bday,  # the actual birthday
+                "end": msg_date + timedelta(hours=24),  # collection window
+                "trigger": (match, match_index, messages[index]),
+                "modifiers": active_modifiers,
+                "multi_target": multi_target,
+                "messages": [index],
+            }
+
+        for index, message in enumerate(messages):
+            msg = remove_repetitions(message.lower(), reps=1)
+            result = get_trigger_match(msg, BDAY_TRIGGER_WORDS)
+            msg_date = dates[index]
+
+            if result is not None:
+                match, match_index = result
+                if current_event is None:
+                    current_event = make_event(index, match, match_index)
+                else: #If there is an ongoing event
+                    is_new_day = msg_date > current_event["trigger_date"]
+                    within_window = msg_date <= current_event["end"]
+
+                    if is_new_day and within_window:
+                        #new trigger on a new calendar day means new birthday
+                        close_event(current_event)
+                        current_event = make_event(index, match, match_index)
+                    else:
+                        # Same day, continuation
+                        current_event["messages"].append(index)
+
+                        if " and " in msg:
+                            current_event["multi_target"] = True
+
+            elif current_event is not None:
+                if msg_date <= current_event["end"]:
+                    current_event["messages"].append(index)
+                else:
+                    close_event(current_event)
+                    current_event = None
+
+        close_event(current_event)
+        return events
+
+    # def resolve_target(events: list[dict]):
+    #     def contains_mentions(message: str):
+    #         if "@⁨" in message:
+    #             return True
+    #         return False
+    #
+    #     def extract_mention(message: str):
+    #         for user in users:
+    #             if message.find("@⁨") == 1 + message.find(user):
+    #                 return user
+    #         return None
+    #
+    #     def contains_reference(match_index: int, message: str):
+    #         reference = message[match_index:]
+    #         if reference is not "":
+    #             return True
+    #         return False
+    #
+    #     def extract_reference(match_index: int, message: str):
+    #         reference = message[match_index:]
+    #         max_match_ratio = 0
+    #         max_match_user = None
+    #         for user in users:
+    #             if fuzz.partial_ratio(reference, user) > max_match_ratio:
+    #                 max_match_ratio = fuzz.partial_ratio(reference, user)
+    #                 max_match_user = user
+    #
+    #         return max_match_user, max_match_ratio/100
+    #
+    #     users = set(user_list)
+    #     scores = {user: 0.0 for user in users}
+    #
+    #     for event in events:
+    #         for index in event.get("messages"):
+    #             msg = remove_repetitions(message.lower(), reps=1)
+    #             if get_trigger_match(messages[index], bday_trigger_words) is not None:
+    #                 if None and contains_mentions(messages[index]):
+    #                     target = extract_mention(messages[index])
+    #                     scores[target] += 1.0
+    #
+    #                 elif contains_reference(event.get("trigger")[0], messages[index]):
+    #                     target, score = extract_reference(event.get("trigger")[0], messages[index])
+    #                     scores[target] += score
+    #
+    #
+    #             if conatins_thank_you(messages[index]):
+    #                 target = user_list[index]
+    #                 scores[target] +=
+
+
+
+
+
+
+
+    return find_birthday_events()
 
 
 # All functions below are related to milestone function
-def _to_datetime(date: date, time: time = time(0,0,0)) -> datetime:
+def _to_datetime(d: date, t: time = time(0, 0, 0)) -> datetime:
     """
     Combines date and time
     """
-    return datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
+    return datetime.strptime(f"{d} {t}", "%Y-%m-%d %H:%M:%S")
 
 def get_group_creation(system_messages: list[dict]):
     for msg in system_messages:
-            if msg["action"] == SysMsgActions.CreateGroup:
-                return msg
+        if msg["action"] == SysMsgActions.CreateGroup:
+            return msg
+    return ""
 
-def get_nth_message(user_messages:list[dict], n: int):
-    for i in range(1,len(user_messages)):
-        if i==n:
+def get_nth_message(user_messages: list[dict], n: int):
+    for i in range(1, len(user_messages)):
+        if i == n:
             return user_messages[n]
+    return ""
 
-def get_user_first_message(user_messages:list[dict], user: str):
+def get_user_first_message(user_messages: list[dict], user: str):
     for msg in user_messages:
         if msg["sender"] is user:
             return msg
+    return ""
 
-def get_user_joins(user_messages:list[dict], system_messages: list[dict], user_list: list[str]):
+def get_user_joins(user_messages: list[dict], system_messages: list[dict], user_list: list[str]):
     user_joins = {}
     mod_user_list = user_list.copy()
     grp_created = get_group_creation(system_messages)
     for msg in system_messages:
         if msg["action"] == SysMsgActions.AddUser:
             if msg["added"] in mod_user_list:
-                user_joins.update({f"{msg["added"]}":_to_datetime(msg["date"], msg["time"])})
+                user_joins.update({f"{msg["added"]}": _to_datetime(msg["date"], msg["time"])})
                 mod_user_list.remove(msg["added"])
         if msg["action"] == SysMsgActions.CreateGroup:
             # For the user who created the group
             user_joins.update({f"{msg["author"]}": _to_datetime(grp_created["date"], grp_created["time"])})
             mod_user_list.remove(msg["author"])
-
 
     for user in user_list:
         if user_joins.get(user) and hasattr(user_joins[user], "date"):
@@ -930,7 +1095,7 @@ def get_user_joins(user_messages:list[dict], system_messages: list[dict], user_l
             # For the user who uploaded the log, since they will be addressed as "You" by the system
             user_joins[user] = _to_datetime(grp_created["date"], grp_created["time"])
 
-    user_joins = ((b,f"{a} has joined the chat") for a,b in user_joins.items())
+    user_joins = ((b, f"{a} has joined the chat") for a, b in user_joins.items())
     return user_joins
 
 def get_milestones(
