@@ -11,6 +11,8 @@ from collections import Counter, defaultdict
 import statistics
 from urllib.parse import urlparse
 import string
+from thefuzz import fuzz
+
 from backend.Util.constants import DOMAIN_MAPS, SysMsgActions
 from math import sqrt
 import yaml
@@ -881,7 +883,7 @@ def normalise_reply_map(
 
 def get_birthdays(
         messages: list[str],
-        user_list: list[str],
+        senders: list[str],
         dates: list[date],
 ):
     """
@@ -904,12 +906,15 @@ def get_birthdays(
         "many hapy returns",
         "birthday wishes"
     ]
+    THANK_YOU_WORDS = [
+        "thank you", "thanks", "thank u", "thnx", "thx", "ty "
+    ]
 
     TEMPORAL_MODIFIERS = {
         # shifts inferred birthday relative to message date
-        "belated": +1,  # bday was yesterday or earlier
+        "belated": +1,
         "late": +1,
-        "advanced": -1,  # bday is tomorrow or later
+        "advanced": -1,
         "advance": -1,
         "early": -1,
         "upcoming": -1,
@@ -917,7 +922,11 @@ def get_birthdays(
 
     def get_trigger_match(text: str, trigger_patterns: list[str]) -> tuple[str, int] | None:
         for pattern in trigger_patterns:
-            if pattern in text:
+            if pattern.startswith("\\b"):  # regex pattern
+                match = re.search(pattern, text)
+                if match:
+                    return pattern, match.start()
+            elif pattern in text:
                 return pattern, text.find(pattern)
         return None
 
@@ -943,15 +952,12 @@ def get_birthdays(
 
             inferred_bday = msg_date + timedelta(days=date_offset)
 
-            multi_target = " and " in raw_msg #for multiple bdays on the same day
-
             return {
                 "trigger_date": msg_date,
                 "inferred_bday": inferred_bday,  # the actual birthday
                 "end": msg_date + timedelta(hours=24),  # collection window
                 "trigger": (match, match_index, messages[index]),
                 "modifiers": active_modifiers,
-                "multi_target": multi_target,
                 "messages": [index],
             }
 
@@ -976,9 +982,6 @@ def get_birthdays(
                         # Same day, continuation
                         current_event["messages"].append(index)
 
-                        if " and " in msg:
-                            current_event["multi_target"] = True
-
             elif current_event is not None:
                 if msg_date <= current_event["end"]:
                     current_event["messages"].append(index)
@@ -989,63 +992,132 @@ def get_birthdays(
         close_event(current_event)
         return events
 
-    # def resolve_target(events: list[dict]):
-    #     def contains_mentions(message: str):
-    #         if "@⁨" in message:
-    #             return True
-    #         return False
-    #
-    #     def extract_mention(message: str):
-    #         for user in users:
-    #             if message.find("@⁨") == 1 + message.find(user):
-    #                 return user
-    #         return None
-    #
-    #     def contains_reference(match_index: int, message: str):
-    #         reference = message[match_index:]
-    #         if reference is not "":
-    #             return True
-    #         return False
-    #
-    #     def extract_reference(match_index: int, message: str):
-    #         reference = message[match_index:]
-    #         max_match_ratio = 0
-    #         max_match_user = None
-    #         for user in users:
-    #             if fuzz.partial_ratio(reference, user) > max_match_ratio:
-    #                 max_match_ratio = fuzz.partial_ratio(reference, user)
-    #                 max_match_user = user
-    #
-    #         return max_match_user, max_match_ratio/100
-    #
-    #     users = set(user_list)
-    #     scores = {user: 0.0 for user in users}
-    #
-    #     for event in events:
-    #         for index in event.get("messages"):
-    #             msg = remove_repetitions(message.lower(), reps=1)
-    #             if get_trigger_match(messages[index], bday_trigger_words) is not None:
-    #                 if None and contains_mentions(messages[index]):
-    #                     target = extract_mention(messages[index])
-    #                     scores[target] += 1.0
-    #
-    #                 elif contains_reference(event.get("trigger")[0], messages[index]):
-    #                     target, score = extract_reference(event.get("trigger")[0], messages[index])
-    #                     scores[target] += score
-    #
-    #
-    #             if conatins_thank_you(messages[index]):
-    #                 target = user_list[index]
-    #                 scores[target] +=
+    def resolve_target(events: list[dict]):
+        def extract_all_mentions(message: str) -> list[str]:
+            """Extract every @mention in a message, not just the first."""
+            found = []
+            search_from = 0
+            while True:
+                start = message.find("@⁨", search_from)
+                if start == -1:
+                    break
+                name_after = message[start + 2:]
+                for user in users:
+                    if name_after.startswith(user):
+                        found.append(user)
+                        break
+                search_from = start + 1
+            return found
 
+        def extract_all_references(trigger_word: str, message: str) -> list[tuple[str, float]]:
+            """
+            Handle 'happy birthday Pruthvi and Diya' by splitting at conjunctions and fuzzy matching each segment separately.
+            """
+            match_index = message.find(trigger_word)
+            if match_index == -1:
+                return []
 
+            # Everything after the trigger word
+            reference = message[match_index + len(trigger_word):].strip()
+            if not reference:
+                return []
 
+            # Split on conjunctions to get individual name segments
+            segments = re.split(r'\band\b|\&|,', reference)
 
+            results = []
+            seen = set()  # avoid double-counting same user
+            for segment in segments:
+                segment = segment.strip()
+                if not segment:
+                    continue
+                best_user, best_ratio = None, 0
+                for user in users:
+                    ratio = fuzz.partial_ratio(segment, user)
+                    if ratio > best_ratio:
+                        best_ratio = ratio
+                        best_user = user
+                if best_user and best_ratio / 100 >= MIN_FUZZY_CONFIDENCE and best_user not in seen:
+                    results.append((best_user, best_ratio / 100))
+                    seen.add(best_user)
 
+            return results
 
+        def contains_thank_you(message: str) -> bool:
+            return any(p in message for p in THANK_YOU_WORDS)
 
-    return find_birthday_events()
+        def resolve_winners(event_scores: dict, threshold_ratio: float = 0.6) -> list[str]:
+            """
+            Return all users whose score is within threshold
+            """
+            if not event_scores:
+                return []
+            max_score = max(event_scores.values())
+            if max_score == 0:
+                return []
+            return [
+                user for user, score in event_scores.items()
+                if score >= max_score * threshold_ratio
+            ]
 
+        MIN_FUZZY_CONFIDENCE = 0.6  # tune this threshold
+
+        users = set(senders)
+        scores = {user: 0.0 for user in users}
+        results = []
+
+        for event in events:
+            event_scores = {user: 0.0 for user in users}
+            for index in event.get("messages"):
+                msg = remove_repetitions(messages[index].lower(), reps=1)
+                sender = senders[index]
+                result = get_trigger_match(msg, BDAY_TRIGGER_WORDS)
+                if result is not None:
+                    match, match_index = result
+
+                    mentions = extract_all_mentions(messages[index])
+                    if mentions:
+                        for mention in mentions:
+                            if mention != sender:
+                                event_scores[mention] += 1.0
+                    else:
+                        ref_results = extract_all_references(match, msg)
+                        for target, confidence in ref_results:
+                            if target != sender:
+                                event_scores[target] += confidence
+
+                elif contains_thank_you(msg):
+                    # Thankyou message sender is likely the birthday person
+                    event_scores[sender] += 0.8
+
+            # Normalise per-event scores and accumulate into global
+            threshold = 0.7
+            winners = resolve_winners(event_scores, threshold_ratio=threshold)
+
+            results.append({
+                "inferred_bday": event["inferred_bday"],
+                "winners": winners,
+                "event_scores": event_scores,
+                "modifiers": event["modifiers"],
+            })
+
+            # Accumulate into global for long-term reaffirmation later
+            event_total = sum(event_scores.values())
+            if event_total > 0:
+                for user, score in event_scores.items():
+                    scores[user] += score / event_total
+
+        return results, scores
+
+    # --- Entry point ---
+    events = find_birthday_events()
+    per_event_results, global_scores = resolve_target(events)
+
+    return {
+        "results": per_event_results,
+        "scores": global_scores,
+        "events": events,
+    }
 
 # All functions below are related to milestone function
 def _to_datetime(d: date, t: time = time(0, 0, 0)) -> datetime:
