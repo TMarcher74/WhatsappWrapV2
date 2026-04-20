@@ -1,21 +1,24 @@
-import datetime
 import re
 import sys
-from datetime import timedelta, datetime, time, date
-from emoji import is_emoji
+import yaml
 import nltk
+import string
+import datetime
+import statistics
+
+from datetime import timedelta, datetime, time, date
+from unidecode import unidecode
+from emoji import is_emoji, replace_emoji
+from math import sqrt
 from nltk import BigramAssocMeasures, TrigramAssocMeasures, sent_tokenize
 from nltk.collocations import BigramCollocationFinder, TrigramCollocationFinder
 from nltk.corpus import stopwords
 from collections import Counter, defaultdict
-import statistics
 from urllib.parse import urlparse
-import string
 from thefuzz import fuzz
 
 from backend.Util.constants import DOMAIN_MAPS, SysMsgActions
-from math import sqrt
-import yaml
+
 
 RE_TOKEN = re.compile(r"\b\w+(?:'\w+)?\b")
 RE_REPS = re.compile(r"(.)\1+")         # (keep only 2 of same char)
@@ -883,7 +886,7 @@ def normalise_reply_map(
 
 def get_birthdays(
         messages: list[str],
-        senders: list[str],
+        senders: set[str],
         dates: list[date],
 ):
     """
@@ -919,6 +922,20 @@ def get_birthdays(
         "early": -1,
         "upcoming": -1,
     }
+
+    NON_NAME_WORDS = {
+    # Common filler words after trigger
+    "again", "once", "more", "too", "also", "dear", "my", "our", "text"
+    "the", "a", "an", "to", "you", "your", "all", "everyone",
+    # Time/temporal words (already handled by modifiers but can leak into segment)
+    "today", "tomorrow", "yesterday",
+    # Common wish words that bleed past the trigger
+    "wishes", "have", "wishing", "wish",
+    # Salutations
+    "beautiful", "lovely", "wonderful", "amazing", "special",
+}
+
+    STOP_WORDS_SET = (set(stopwords.words('english')) | NON_NAME_WORDS)
 
     def get_trigger_match(text: str, trigger_patterns: list[str]) -> tuple[str, int] | None:
         for pattern in trigger_patterns:
@@ -958,7 +975,7 @@ def get_birthdays(
                 "end": msg_date + timedelta(hours=24),  # collection window
                 "trigger": (match, match_index, messages[index]),
                 "modifiers": active_modifiers,
-                "messages": [index],
+                "messages": [(index, messages[index])],
             }
 
         for index, message in enumerate(messages):
@@ -972,19 +989,19 @@ def get_birthdays(
                     current_event = make_event(index, match, match_index)
                 else: #If there is an ongoing event
                     is_new_day = msg_date > current_event["trigger_date"]
-                    within_window = msg_date <= current_event["end"]
+                    within_window = msg_date < current_event["end"]
 
-                    if is_new_day and within_window:
+                    if is_new_day and not within_window:
                         #new trigger on a new calendar day means new birthday
                         close_event(current_event)
                         current_event = make_event(index, match, match_index)
                     else:
                         # Same day, continuation
-                        current_event["messages"].append(index)
+                        current_event["messages"].append((index, messages[index]))
 
             elif current_event is not None:
-                if msg_date <= current_event["end"]:
-                    current_event["messages"].append(index)
+                if msg_date < current_event["end"]:
+                    current_event["messages"].append((index,messages[index]))
                 else:
                     close_event(current_event)
                     current_event = None
@@ -993,6 +1010,10 @@ def get_birthdays(
         return events
 
     def resolve_target(events: list[dict]):
+        def lang_normalize(text: str) -> str:
+            """To make Anjana and ANಜNA work"""
+            return unidecode(text).lower().strip()
+
         def extract_all_mentions(message: str) -> list[str]:
             """Extract every @mention in a message, not just the first."""
             found = []
@@ -1009,18 +1030,48 @@ def get_birthdays(
                 search_from = start + 1
             return found
 
+        def get_combinations(name: str) -> list[str]:
+            """
+            Split name into components and return all variants to match against.
+            Like Love Guru would give ["Love Guru", "Love", "Guru"]
+            """
+            # Split on space and underscore, filter empty strings
+            parts = [p for p in re.split(r'[\s_]+', name) if p and len(p) > 1]
+            variants = [name] + parts  # full name + each component
+            return list(dict.fromkeys(variants))  # deduplicate while preserving order
+
+        def clean_segment(segment: str) -> str:
+            """Remove non-name words from a segment before fuzzy matching."""
+            cleaned = replace_emoji(segment, replace='')
+            words = cleaned.strip().split()
+            filtered = [w for w in words if w.lower() not in STOP_WORDS_SET]
+            return " ".join(filtered).strip()
+
         def extract_all_references(trigger_word: str, message: str) -> list[tuple[str, float]]:
             """
             Handle 'happy birthday Pruthvi and Diya' by splitting at conjunctions and fuzzy matching each segment separately.
             """
-            match_index = message.find(trigger_word)
-            if match_index == -1:
+            truncated_msg = remove_repetitions(message.lower(), reps=1)
+            truncated_words = truncated_msg.split()
+            trigger_words = trigger_word.split()
+            trigger_len = len(trigger_words)
+
+            # Find trigger start index in truncated word list
+            trigger_start = None
+            for i in range(len(truncated_words) - trigger_len + 1):
+                if truncated_words[i:i + trigger_len] == trigger_words:
+                    trigger_start = i
+                    break
+
+            if trigger_start is None:
                 return []
 
-            # Everything after the trigger word
-            reference = message[match_index + len(trigger_word):].strip()
+            # Apply the same offset to the original message words
+            original_words = message.lower().split()
+            reference = " ".join(original_words[trigger_start + trigger_len:]).strip()
+
             if not reference:
-                return []
+                    return []
 
             # Split on conjunctions to get individual name segments
             segments = re.split(r'\band\b|\&|,', reference)
@@ -1028,18 +1079,27 @@ def get_birthdays(
             results = []
             seen = set()  # avoid double-counting same user
             for segment in segments:
-                segment = segment.strip()
+                segment = clean_segment(segment)
                 if not segment:
                     continue
-                best_user, best_ratio = None, 0
+                best_users, best_ratio = [], 0
                 for user in users:
-                    ratio = fuzz.partial_ratio(segment, user)
-                    if ratio > best_ratio:
-                        best_ratio = ratio
-                        best_user = user
-                if best_user and best_ratio / 100 >= MIN_FUZZY_CONFIDENCE and best_user not in seen:
-                    results.append((best_user, best_ratio / 100))
-                    seen.add(best_user)
+                    variants = get_combinations(user)
+                    best_variant_ratio = max(
+                        fuzz.partial_ratio(lang_normalize(segment), lang_normalize(variant))
+                        for variant in variants
+                    )
+                    if best_variant_ratio > best_ratio:
+                        best_ratio = best_variant_ratio
+                        best_users = [user]
+                    elif best_variant_ratio == best_ratio:
+                        # Added for cases like Ananya M and Ananya Juni
+                        best_users.append(user)
+
+                for user in best_users:
+                    if best_ratio / 100 >= MIN_FUZZY_CONFIDENCE and user not in seen:
+                        results.append((user, best_ratio / 100))
+                        seen.add(user)
 
             return results
 
@@ -1063,36 +1123,36 @@ def get_birthdays(
         MIN_FUZZY_CONFIDENCE = 0.6  # tune this threshold
 
         users = set(senders)
+        users.discard("Meta AI")
         scores = {user: 0.0 for user in users}
         results = []
 
         for event in events:
             event_scores = {user: 0.0 for user in users}
-            for index in event.get("messages"):
-                msg = remove_repetitions(messages[index].lower(), reps=1)
+            for index, message in event.get("messages"):
+                truncated_msg = remove_repetitions(message.lower(), reps=1)
                 sender = senders[index]
-                result = get_trigger_match(msg, BDAY_TRIGGER_WORDS)
+                result = get_trigger_match(truncated_msg, BDAY_TRIGGER_WORDS)
                 if result is not None:
                     match, match_index = result
 
-                    mentions = extract_all_mentions(messages[index])
+                    mentions = extract_all_mentions(message)
                     if mentions:
                         for mention in mentions:
                             if mention != sender:
-                                event_scores[mention] += 1.0
+                                event_scores[mention] += 10.0
                     else:
-                        ref_results = extract_all_references(match, msg)
+                        ref_results = extract_all_references(match, message)
                         for target, confidence in ref_results:
                             if target != sender:
                                 event_scores[target] += confidence
 
-                elif contains_thank_you(msg):
+                elif contains_thank_you(truncated_msg):
                     # Thankyou message sender is likely the birthday person
-                    event_scores[sender] += 0.8
+                    event_scores[sender] += 5.0
 
             # Normalise per-event scores and accumulate into global
-            threshold = 0.7
-            winners = resolve_winners(event_scores, threshold_ratio=threshold)
+            winners = resolve_winners(event_scores, threshold_ratio=0.3)
 
             results.append({
                 "inferred_bday": event["inferred_bday"],
@@ -1118,6 +1178,83 @@ def get_birthdays(
         "scores": global_scores,
         "events": events,
     }
+
+def verify_birthdays(
+        all_year_results: list[dict],  # list of get_birthdays() outputs across years
+) -> dict[str, dict]:
+    """
+    1. Remove Duplicates, each user keeps only their highest-scoring event
+    2. Verify across years, boost confidence
+    Return: {user: birthday_date}
+    """
+
+    MIN_FINAL_CONFIDENCE = 0.1  # tune — fraction of total score to be considered valid
+
+    # Flatten all per-event results across all years into:
+    # {user: [(inferred_date, normalised_score), ...]}
+    user_candidates: dict[str, list[tuple[date, float]]] = {}
+
+    for year_result in all_year_results:
+        for event_result in year_result["results"]:
+            inferred_bday = event_result["inferred_bday"]
+            event_scores = event_result["event_scores"]
+            winners = event_result["winners"]
+
+            # Normalise scores within this event so cross-event comparison is fair
+            event_max = max(event_scores.values())
+            if event_max == 0:
+                continue
+
+            for user, score in event_scores.items():
+                if score == 0:
+                    continue
+                if user not in winners:
+                    continue
+                if user not in user_candidates:
+                    user_candidates[user] = []
+                user_candidates[user].append((inferred_bday, score))
+
+    final_birthdays: dict[str, dict] = {}
+
+    for user, candidates in user_candidates.items():
+        if not candidates:
+            continue
+
+        #Pick the single highest-scoring event as the primary candidate
+        best_date, best_score = max(candidates, key=lambda x: x[1])
+
+        #Check if other years agree on the same month/day
+        agreements = [
+            score for date_, score in candidates
+            if date_.month == best_date.month and date_.day == best_date.day
+            and date_ != best_date  # exclude the primary itself
+        ]
+
+        # Boost confidence for each agreeing year
+        year_bonus = len(agreements) * 0.15
+        final_confidence = best_score + year_bonus
+
+        if final_confidence >= MIN_FINAL_CONFIDENCE:
+            final_birthdays[user] = {
+                "date": best_date,
+                "confidence": final_confidence,
+                "confirmed_by_years": len(agreements) + 1,
+            }
+
+    #If two users share the same inferred date with close scores, (could be a co-birthday or a false match)
+    date_to_users: dict[tuple, list[str]] = {}
+    for user, info in final_birthdays.items():
+        d = info["date"]
+        key = (d.month, d.day) #ignore year
+        date_to_users.setdefault(key, []).append(user)
+
+    for d, users_on_date in date_to_users.items():
+        if len(users_on_date) > 1:
+            # More than one user resolved to the same date — flag as co-birthday
+            for user in users_on_date:
+                final_birthdays[user]["co_birthday"] = True
+
+    return final_birthdays
 
 # All functions below are related to milestone function
 def _to_datetime(d: date, t: time = time(0, 0, 0)) -> datetime:
