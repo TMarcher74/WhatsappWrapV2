@@ -1308,13 +1308,10 @@ def get_user_joins(user_messages: list[dict], system_messages: list[dict], user_
     return user_joins
 
 def get_milestones(
-        user_messages:list[dict],
-        system_messages:list[dict],
-        user_list: list[str],
-        dates: list[date],
-        top_convos: dict,
-        streak: dict,
-        is_group: bool
+        parsed_data,
+        min_convo_time,
+        min_convo_length,
+        top_n
 ) -> list[tuple[str,str]]:
     """
     Covers these milestones:
@@ -1330,6 +1327,21 @@ def get_milestones(
 
     Sorts them by time and returns the datetime and the reason for milestone as tuple
     """
+    user_messages = parsed_data.user_messages
+    system_messages =parsed_data.system_messages
+    user_list = parsed_data.get_users()
+    dates = parsed_data.get_date_by_user()
+    is_group = parsed_data.is_group()
+    streak = get_longest_streak(parsed_data.get_date_by_user())
+    top_convos = get_top_convos(
+                parsed_data.get_date_time_by_user(),
+                parsed_data.get_messages_by_user(),
+                parsed_data.get_users_wrt_messages(),
+                min_convo_time,
+                min_convo_length,
+                top_n
+            )
+
     grp_milestones = []
     chat_milestones = []
 

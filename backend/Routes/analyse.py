@@ -332,23 +332,14 @@ async def get_milestones(
         top_n: int = Query(5, ge=1, description= "Returns top n number of convos")
 ):
     parsed_data = verify_parsed_data(file_id)
+    user_messages = get_user_messages(parsed_data)
     return {
         "milestones":
         analyser.get_milestones(
-            parsed_data.user_messages,
-            parsed_data.system_messages,
-            parsed_data.get_users(),
-            parsed_data.get_date_by_user(),
-            analyser.get_top_convos(
-                parsed_data.get_date_time_by_user(),
-                parsed_data.get_messages_by_user(),
-                parsed_data.get_users_wrt_messages(),
-                min_convo_time,
-                min_convo_length,
-                top_n
-            ),
-            analyser.get_longest_streak(parsed_data.get_date_by_user()),
-            parsed_data.is_group(),
+            parsed_data,
+            min_convo_time,
+            min_convo_length,
+            top_n
         )
     }
 
@@ -385,7 +376,7 @@ async def analyse_all(file_id: str):
     # Retrieve parsed data from cache
     parsed_data = verify_parsed_data(file_id)
 
-    # Organize messages by user
+    # Organise messages by user
     user_messages = {
         user: parsed_data.get_messages_by_user(user)
         for user in parsed_data.get_users()
@@ -435,20 +426,10 @@ async def analyse_all(file_id: str):
             parsed_data.get_users(),
             parsed_data.get_date_by_user()),
         "milestones": analyser.get_milestones(
-            parsed_data.user_messages,
-            parsed_data.system_messages,
-            parsed_data.get_users(),
-            parsed_data.get_date_by_user(),
-            analyser.get_top_convos(
-                parsed_data.get_date_time_by_user(),
-                parsed_data.get_messages_by_user(),
-                parsed_data.get_users_wrt_messages(),
-                min_convo_time=5,
-                min_convo_length=20,
-                top_n=5
-            ),
-            analyser.get_longest_streak(parsed_data.get_date_by_user()),
-            parsed_data.is_group(),
+            parsed_data,
+            5,
+            20,
+            5
         ),
         "convos": analyser.get_top_convos(
             parsed_data.get_date_time_by_user(),
