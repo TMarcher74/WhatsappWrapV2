@@ -1324,6 +1324,7 @@ def get_milestones(
     - Longest convo in minutes
     - Most messages sent in a convo
     - Streak start and end
+    - Capture the number of words typed in a meaningful way
 
     Sorts them by time and returns the datetime and the reason for milestone as tuple
     """
@@ -1398,9 +1399,17 @@ def get_milestones(
     chat_milestones.append((_to_datetime(streak["Streak end"]), f"The {streak["Streak in days"]} day streak ended today."))
 
     # Last message
-    _ = get_nth_message(user_messages, len(user_messages)-1)
+    last_message = get_nth_message(user_messages, len(user_messages)-1)
     chat_milestones.append(
-        (_to_datetime(_["date"], _["time"]), f"The last message was sent by {_["sender"]} : {_["message"]}"))
+        (_to_datetime(last_message["date"], last_message["time"]), f"The last message was sent by {_["sender"]} : {_["message"]}"))
+
+    msgs = {
+        user: parsed_data.get_messages_by_user(user)
+        for user in parsed_data.get_users()
+    }
+    total_words_typed = get_message_stats(msgs, False).get("words")
+    chat_milestones.append((_to_datetime(last_message["date"], last_message["time"]), f"Your chat has {total_words_typed/257000:.2f} times the word count of the Order of the Phoenix (257,000 words)."
+                                                                                      f" Or {total_words_typed/575000:.2f} times the word count of the War and Peace or the Lord of the Rings triology (~575,000 words)"))
 
     for _ in chat_milestones:
         grp_milestones.append(_)
